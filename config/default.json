@@ -3,5 +3,10 @@
         "host": "0.0.0.0",
         "port": 8000,
         "baseURL": "http://localhost:8000/"
+    },
+
+    "lark": {
+        "appID": "xxx",
+        "appSecret": "xxx"
     }
 }
