@@ -1,0 +1,27 @@
+{
+  "name": "notify",
+  "version": "0.0.1",
+  "description": "",
+  "scripts": {
+    "dev": "nodemon --watch config --watch src src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/no-end-to-learning/notify.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/no-end-to-learning/notify/issues"
+  },
+  "homepage": "https://github.com/no-end-to-learning/notify#readme",
+  "dependencies": {
+    "config": "^3.3.8",
+    "koa": "^2.13.4",
+    "pino": "^8.7.0",
+    "pino-pretty": "^9.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  }
+}
