@@ -1,0 +1,12 @@
+{
+    "server": {
+        "host": "APP_SERVER_HOST",
+        "port": "APP_SERVER_PORT",
+        "baseURL": "APP_SERVER_BASE_URL"
+    },
+
+    "lark": {
+        "appID": "APP_LARK_ID",
+        "appSecret": "APP_LARK_SECRET"
+    }
+}
