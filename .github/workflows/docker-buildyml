@@ -1,11 +1,9 @@
-name: Docker Image CI
+name: Docker Build CI
 
 on:
   push:
     branches:
-      - main
-    tags:
-      - "*.*.*"
+      - master
 
 jobs:
   build:
@@ -26,10 +24,5 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
           push: true
-          build-args: |
-            VERSION=${{ github.ref_name }}
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/notify:${{ github.ref_name }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/notify:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/notify:latest
