@@ -3,13 +3,14 @@ FROM node:16-alpine
 ENV APP_ROOT /app
 ENV NODE_ENV production
 
+EXPOSE 8000
+
 WORKDIR ${APP_ROOT}
 
-COPY package.json package-lock.json src ${APP_ROOT}/
-COPY config ${APP_ROOT}/config/
+COPY package.json package-lock.json ./
 
 RUN npm install
 
-EXPOSE 8000
+COPY . .
 
-CMD ["node", "index.js"]
+CMD ["node", "src/index.js"]
