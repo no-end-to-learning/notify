@@ -1,11 +1,10 @@
 FROM node:16-alpine
 
-ENV APP_ROOT /app
+WORKDIR /app
+
 ENV NODE_ENV production
 
 EXPOSE 8000
-
-WORKDIR ${APP_ROOT}
 
 COPY package.json package-lock.json ./
 
