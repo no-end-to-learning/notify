@@ -1,4 +1,4 @@
-FROM node:18
+FROM node:16-alpine
 
 ENV APP_ROOT /app
 ENV NODE_ENV production
