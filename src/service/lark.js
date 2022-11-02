@@ -1,3 +1,4 @@
+const fs = require('fs')
 const config = require('config')
 const axios = require('axios')
 const lark = require("@larksuiteoapi/allcore");
@@ -15,6 +16,15 @@ exports.listChats = async () => {
     return lark.api.sendRequest(conf, req)
 }
 
+exports.uploadImage = async (imageUrl) => {
+    const {data:imageBody} = await axios.get(imageUrl, { responseType: 'arraybuffer' })
+    const formData = new lark.api.FormData()
+    formData.addField("image_type", "message")
+    formData.addFile("image", new lark.api.File().setContent(imageBody).setType("image/png"))
+    const req = lark.api.newRequest("/open-apis/im/v1/images", "POST", lark.api.AccessTokenType.Tenant, formData)
+    return lark.api.sendRequest(conf, req)
+}
+
 exports.sendCardMessageToChat = async (chatId, params) => {
     if (params.html) {
         params.url = larkService.HTMLContentToURL(params.html)
@@ -27,6 +37,12 @@ exports.sendCardMessageToChat = async (chatId, params) => {
         "elements": []
     }
 
+    if (params.url) {
+        message['card_link'] = {
+            "url": params.url
+        }
+    }
+
     if (params.title) {
         message['header'] = {
             "title": {
@@ -37,24 +53,21 @@ exports.sendCardMessageToChat = async (chatId, params) => {
         }
     }
 
+    if (params.image) {
+        message['elements'].push({
+            "tag": "img",
+            "img_key": params.image,
+            "alt": {
+                "tag": "plain_text",
+                "content": params.title || 'image'
+            }
+        })
+    }
+
     if (params.content) {
         message['elements'].push({
                 "tag": "markdown",
                 "content": params.content
-        })
-    }
-
-    if (params.url) {
-        message['elements'].push({
-                "tag": "action",
-                "actions": [{
-                    "tag": "button",
-                    "text": {
-                        "tag": "plain_text",
-                        "content": "View Details"
-                    },
-                    "url": params.url
-                }]
         })
     }
 
