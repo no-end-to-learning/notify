@@ -31,21 +31,19 @@ router.post('/message/send/grafana', async (ctx, next) => {
     if (body.state === 'alerting') {
         params = {
             color: "Orange",
-            title: '',
+            title: body.ruleName,
         }
     } else if (body.state === "ok") {
         params = {
             color: "Green",
-            title: '✅ '
+            title: '✅ ' + body.ruleName
         }
     } else {
         params = {
             color: "Grey",
-            title: '',
+            title: body.ruleName,
         }
     }
-
-    params.title += body.title.substring(body.state.length + 3)
 
     body.evalMatches.sort((a,b) => a.metric - b.metric);
     params.content = body.evalMatches.map(item => `${item.metric}: ${item.value}`).join("\n")
@@ -54,6 +52,8 @@ router.post('/message/send/grafana', async (ctx, next) => {
     if (!params.content && !params.note) {
         params.note = new Date().toString()
     }
+
+    params.url = body.ruleUrl
 
     const { receive_id } = ctx.request.query
     const res = await larkService.sendCardMessageToChat(receive_id, params)
