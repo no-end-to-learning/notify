@@ -55,8 +55,10 @@ router.post('/message/send/grafana', async (ctx, next) => {
 
     params.url = body.ruleUrl
 
-    let imageRes = await larkService.uploadImage(body.imageUrl)
-    params.image = imageRes?.data?.image_key
+    if (body.imageUrl) {
+        let imageRes = await larkService.uploadImage(body.imageUrl)
+        params.image = imageRes?.data?.image_key
+    }
 
     const { receive_id } = ctx.request.query
     const res = await larkService.sendCardMessageToChat(receive_id, params)
