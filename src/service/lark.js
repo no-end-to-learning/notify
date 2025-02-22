@@ -1,5 +1,6 @@
 const config = require('config')
 const axios = require('axios')
+const streamifier = require('streamifier')
 const lark = require("@larksuiteoapi/node-sdk");
 const logger = require('../lib/logger')
 
@@ -81,6 +82,20 @@ exports.sendCardMessageToChat = async (chatId, params) => {
     }
 
     return this.sendRawCardMessageToChat(chatId, message)
+}
+
+exports.uploadImage = async (imageUrl) => {
+    let downloadResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' })
+    let imageBuffer = Buffer.from(downloadResponse.data)
+    let imageReadableStream = streamifier.createReadStream(imageBuffer)
+
+    let uploadReponse = await larkClient.im.v1.image.create({
+        data: {
+            image_type: 'message',
+            image: imageReadableStream,
+        },
+    })
+    return uploadReponse.image_key
 }
 
 exports.sendRawCardMessageToChat = async (chatId, message) => {

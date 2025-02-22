@@ -54,8 +54,7 @@ router.post('/message/send/grafana', async (ctx, next) => {
     }
 
     if (body.imageUrl) {
-        let imageRes = await larkService.uploadImage(body.imageUrl)
-        params.image = imageRes?.data?.image_key
+        params.image = await larkService.uploadImage(body.imageUrl)
     }
 
     const { receive_id } = ctx.request.query
