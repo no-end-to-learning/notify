@@ -1,33 +1,27 @@
-const fs = require('fs')
 const config = require('config')
 const axios = require('axios')
-const lark = require("@larksuiteoapi/allcore");
+const lark = require("@larksuiteoapi/node-sdk");
 const logger = require('../lib/logger')
 
 const larkConfig = config.get('lark')
-const appSettings = lark.newInternalAppSettings(larkConfig)
-
-const conf = lark.newConfig(lark.Domain.LarkSuite, appSettings, {
-    loggerLevel: lark.LoggerLevel.ERROR,
+const larkClient = new lark.Client({
+    appType: lark.AppType.SelfBuild,
+    domain: lark.Domain.Feishu,
+    loggerLevel: lark.LoggerLevel.error,
+    ...larkConfig
 })
 
 exports.listChats = async () => {
-    const req = lark.api.newRequest("/open-apis/im/v1/chats", "GET", lark.api.AccessTokenType.Tenant)
-    return lark.api.sendRequest(conf, req)
-}
-
-exports.uploadImage = async (imageUrl) => {
-    const {data:imageBody} = await axios.get(imageUrl, { responseType: 'arraybuffer' })
-    const formData = new lark.api.FormData()
-    formData.addField("image_type", "message")
-    formData.addFile("image", new lark.api.File().setContent(imageBody).setType("image/png"))
-    const req = lark.api.newRequest("/open-apis/im/v1/images", "POST", lark.api.AccessTokenType.Tenant, formData)
-    return lark.api.sendRequest(conf, req)
+    return larkClient.im.chat.list({
+        params: {
+            page_size: 100
+        },
+    }, lark.withTenantToken(""))
 }
 
 exports.sendCardMessageToChat = async (chatId, params) => {
     if (params.html) {
-        params.url = larkService.HTMLContentToURL(params.html)
+        params.url = this.HTMLContentToURL(params.html)
     }
 
     const message = {
@@ -66,8 +60,8 @@ exports.sendCardMessageToChat = async (chatId, params) => {
 
     if (params.content) {
         message['elements'].push({
-                "tag": "markdown",
-                "content": params.content
+            "tag": "markdown",
+            "content": params.content
         })
     }
 
@@ -91,14 +85,16 @@ exports.sendCardMessageToChat = async (chatId, params) => {
 
 exports.sendRawCardMessageToChat = async (chatId, message) => {
     logger.info("send %s to %s", JSON.stringify(message), chatId)
-    const messageBody = {
-        "receive_id": chatId,
-        "msg_type": "interactive",
-        "content": JSON.stringify(message)
-    }
-
-    const req = lark.api.newRequest("/open-apis/im/v1/messages?receive_id_type=chat_id", "POST", lark.api.AccessTokenType.Tenant, messageBody)
-    return lark.api.sendRequest(conf, req)
+    return larkClient.im.message.create({
+        params: {
+            receive_id_type: 'chat_id',
+        },
+        data: {
+            receive_id: chatId,
+            msg_type: 'interactive',
+            content: JSON.stringify(message)
+        },
+    }, lark.withTenantToken(""));
 }
 
 
