@@ -6,7 +6,7 @@
     },
 
     "lark": {
-        "appID": "APP_LARK_ID",
+        "appId": "APP_LARK_ID",
         "appSecret": "APP_LARK_SECRET"
     }
 }
