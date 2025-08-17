@@ -45,7 +45,7 @@ router.post('/message/send/grafana', async (ctx, next) => {
         }
     }
 
-    body.evalMatches.sort((a,b) => a.metric.localeCompare(b.metric));
+    // body.evalMatches.sort((a,b) => a.metric.localeCompare(b.metric));
     params.content = body.evalMatches.map(item => `${item.metric}: ${item.value}`).join("\n")
 
     params.note = body.message;
