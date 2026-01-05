@@ -1,15 +1,28 @@
-FROM node:16-alpine
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
-ENV NODE_ENV production
-
-EXPOSE 8000
-
 COPY package.json package-lock.json ./
 
-RUN npm install
+RUN npm ci
 
 COPY . .
 
-CMD ["node", "src/index.js"]
+RUN npm run build
+
+FROM node:24-alpine
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+COPY package.json package-lock.json ./
+
+RUN npm ci --omit=dev
+
+COPY --from=builder /app/dist ./dist
+COPY config ./config
+
+EXPOSE 8000
+
+CMD ["node", "dist/index.js"]
