@@ -1,12 +1,14 @@
 {
-    "server": {
-        "host": "0.0.0.0",
-        "port": 8000,
-        "baseURL": "http://localhost:8000/"
-    },
-
-    "lark": {
-        "appId": "xxx",
-        "appSecret": "xxx"
-    }
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "baseURL": "http://localhost:8000/"
+  },
+  "lark": {
+    "appId": "xxx",
+    "appSecret": "xxx"
+  },
+  "wecom": {
+    "webhookUrl": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send"
+  }
 }
