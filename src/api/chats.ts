@@ -1,4 +1,4 @@
-import Router from 'koa-router'
+import Router from '@koa/router'
 import { getService } from '../services/base.js'
 import { ValidationError } from '../lib/errors.js'
 import { ChatsQuerySchema } from '../schemas/notify.js'
