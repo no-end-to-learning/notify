@@ -30,7 +30,7 @@ export type SendMessageInput = z.infer<typeof SendMessageSchema>
 export const SendRawMessageSchema = z.object({
   channel: ChannelSchema,
   to: z.string().min(1),
-  message: z.record(z.unknown())
+  message: z.record(z.string(), z.unknown())
 })
 export type SendRawMessageInput = z.infer<typeof SendRawMessageSchema>
 

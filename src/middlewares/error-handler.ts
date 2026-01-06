@@ -1,5 +1,6 @@
 import type { Context, Next } from 'koa'
 import { ZodError } from 'zod'
+import type { $ZodIssue } from 'zod/v4/core'
 import { AppError } from '../lib/errors.js'
 import { logger } from '../lib/logger.js'
 
@@ -8,7 +9,7 @@ export async function errorHandler(ctx: Context, next: Next) {
     await next()
   } catch (err) {
     if (err instanceof ZodError) {
-      const message = err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
+      const message = err.issues.map((e: $ZodIssue) => `${e.path.join('.')}: ${e.message}`).join(', ')
       logger.warn({ path: ctx.path }, `Validation error: ${message}`)
       ctx.status = 400
       ctx.body = {

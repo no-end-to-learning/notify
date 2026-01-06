@@ -1,4 +1,4 @@
-import Router from 'koa-router'
+import Router from '@koa/router'
 import { getService } from '../../services/base.js'
 import { logger } from '../../lib/logger.js'
 import { GrafanaAlertSchema, GrafanaQuerySchema, type GrafanaAlert, type Channel } from '../../schemas/notify.js'

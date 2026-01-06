@@ -1,4 +1,4 @@
-import Router from 'koa-router'
+import Router from '@koa/router'
 import { getService } from '../services/base.js'
 import { SendMessageSchema, SendRawMessageSchema } from '../schemas/notify.js'
 

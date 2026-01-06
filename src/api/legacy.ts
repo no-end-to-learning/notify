@@ -1,5 +1,5 @@
 // 旧版 API 兼容层，待废弃后删除
-import Router from 'koa-router'
+import Router from '@koa/router'
 import { getService } from '../services/base.js'
 import { logger } from '../lib/logger.js'
 import { GrafanaAlertSchema, MessageParamsSchema } from '../schemas/notify.js'
