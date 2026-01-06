@@ -72,7 +72,7 @@ docker run -p 8000:8000 \
 ### 发送消息
 
 ```
-POST /api/notify/send
+POST /api/messages
 Content-Type: application/json
 
 {
@@ -105,7 +105,7 @@ Content-Type: application/json
 ### 发送原始消息
 
 ```
-POST /api/notify/raw
+POST /api/messages/raw
 Content-Type: application/json
 
 {
@@ -122,7 +122,7 @@ Content-Type: application/json
 ### Grafana 告警
 
 ```
-POST /api/notify/grafana?channel=lark&to=oc_xxx
+POST /api/webhooks/grafana?channel=lark&to=oc_xxx
 Content-Type: application/json
 
 {
@@ -139,8 +139,19 @@ Content-Type: application/json
 ### 获取聊天列表（仅飞书）
 
 ```
-GET /api/notify/chats?channel=lark
+GET /api/chats?channel=lark
 ```
+
+## 旧版 API（兼容）
+
+以下 API 保留兼容，建议迁移至新 API：
+
+| 旧 API | 新 API |
+|--------|--------|
+| POST /api/lark/message/send | POST /api/messages |
+| POST /api/lark/message/send/raw | POST /api/messages/raw |
+| POST /api/lark/message/send/grafana | POST /api/webhooks/grafana |
+| GET /api/lark/chats | GET /api/chats?channel=lark |
 
 ## 环境变量
 
