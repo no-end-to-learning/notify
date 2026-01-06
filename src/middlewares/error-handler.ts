@@ -8,15 +8,18 @@ export async function errorHandler(ctx: Context, next: Next) {
     await next()
   } catch (err) {
     if (err instanceof ZodError) {
+      const message = err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
+      logger.warn({ path: ctx.path }, `Validation error: ${message}`)
       ctx.status = 400
       ctx.body = {
         error: 'VALIDATION_ERROR',
-        message: err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
+        message
       }
       return
     }
 
     if (err instanceof AppError) {
+      logger.warn({ path: ctx.path, code: err.code }, err.message)
       ctx.status = err.statusCode
       ctx.body = {
         error: err.code || 'ERROR',
@@ -25,7 +28,7 @@ export async function errorHandler(ctx: Context, next: Next) {
       return
     }
 
-    logger.error(err, 'Unhandled error')
+    logger.error({ err, path: ctx.path }, 'Unhandled error')
     ctx.status = 500
     ctx.body = {
       error: 'INTERNAL_ERROR',

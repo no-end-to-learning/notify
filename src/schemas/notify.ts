@@ -6,13 +6,17 @@ export type Channel = z.infer<typeof ChannelSchema>
 export const ColorSchema = z.enum(['Blue', 'Green', 'Orange', 'Grey', 'Red', 'Purple'])
 export type Color = z.infer<typeof ColorSchema>
 
+// 将 null 转换为 undefined，使 null 和不传字段行为一致
+const nullable = <T extends z.ZodTypeAny>(schema: T) =>
+  schema.nullish().transform((val) => val ?? undefined)
+
 export const MessageParamsSchema = z.object({
-  title: z.string().optional(),
-  color: ColorSchema.optional(),
-  content: z.string().optional(),
-  image: z.string().optional(),
-  url: z.string().url().optional(),
-  note: z.string().optional()
+  title: nullable(z.string()),
+  color: nullable(ColorSchema),
+  content: nullable(z.string()),
+  image: nullable(z.string()),
+  url: nullable(z.string().url()),
+  note: nullable(z.string())
 })
 export type MessageParams = z.infer<typeof MessageParamsSchema>
 
