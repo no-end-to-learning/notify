@@ -1,33 +1,13 @@
 import Router from 'koa-router'
 import { getService } from '../services/base.js'
 import { logger } from '../lib/logger.js'
-import { ValidationError } from '../lib/errors.js'
 import {
-  SendMessageSchema,
-  SendRawMessageSchema,
   GrafanaAlertSchema,
   GrafanaQuerySchema,
-  ChatsQuerySchema,
   type MessageParams
 } from '../schemas/notify.js'
 
-const router = new Router({ prefix: '/api/notify' })
-
-// 发送消息
-router.post('/send', async (ctx) => {
-  const input = SendMessageSchema.parse(ctx.request.body)
-  const service = getService(input.channel)
-  const result = await service.sendMessage(input.to, input.params)
-  ctx.body = result
-})
-
-// 发送原始消息
-router.post('/raw', async (ctx) => {
-  const input = SendRawMessageSchema.parse(ctx.request.body)
-  const service = getService(input.channel)
-  const result = await service.sendRawMessage(input.to, input.message)
-  ctx.body = result
-})
+const router = new Router({ prefix: '/api/webhooks' })
 
 // Grafana 告警
 router.post('/grafana', async (ctx) => {
@@ -75,19 +55,6 @@ router.post('/grafana', async (ctx) => {
 
   const result = await service.sendMessage(query.to, params)
   ctx.body = result
-})
-
-// 获取聊天列表（仅飞书支持）
-router.get('/chats', async (ctx) => {
-  const query = ChatsQuerySchema.parse(ctx.request.query)
-  const service = getService(query.channel)
-
-  if (!service.listChats) {
-    throw new ValidationError(`Channel ${query.channel} does not support listing chats`)
-  }
-
-  const chats = await service.listChats()
-  ctx.body = chats
 })
 
 export default router
