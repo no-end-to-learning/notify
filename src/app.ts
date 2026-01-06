@@ -1,13 +1,19 @@
 import Koa from 'koa'
 import bodyParser from 'koa-bodyparser'
 import { errorHandler } from './middlewares/error-handler.js'
-import notifyRouter from './api/notify.js'
+import messagesRouter from './api/messages.js'
+import chatsRouter from './api/chats.js'
+import webhooksRouter from './api/webhooks.js'
 
 const app = new Koa()
 
 app.use(errorHandler)
 app.use(bodyParser())
-app.use(notifyRouter.routes())
-app.use(notifyRouter.allowedMethods())
+app.use(messagesRouter.routes())
+app.use(messagesRouter.allowedMethods())
+app.use(chatsRouter.routes())
+app.use(chatsRouter.allowedMethods())
+app.use(webhooksRouter.routes())
+app.use(webhooksRouter.allowedMethods())
 
 export default app
