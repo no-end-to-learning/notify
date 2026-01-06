@@ -89,7 +89,7 @@ function buildLarkMessage(alert: GrafanaAlert) {
     elements.push({
       tag: 'markdown',
       content: alert.evalMatches
-        .map(item => `**${item.metric}**: ${item.value}`)
+        .map(item => `${item.metric}: ${item.value}`)
         .join('\n')
     })
   }
