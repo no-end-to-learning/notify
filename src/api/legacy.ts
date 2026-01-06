@@ -6,6 +6,12 @@ import { GrafanaAlertSchema, MessageParamsSchema } from '../schemas/notify.js'
 
 const router = new Router({ prefix: '/api/lark' })
 
+// 为所有旧版 API 请求添加 deprecated 日志
+router.use(async (ctx, next) => {
+  logger.warn({ path: ctx.path, method: ctx.method }, '[DEPRECATED] Legacy API called, please migrate to new API')
+  await next()
+})
+
 const larkService = getService('lark')
 
 router.get('/chats', async (ctx) => {
