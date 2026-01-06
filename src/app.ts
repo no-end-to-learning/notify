@@ -3,7 +3,7 @@ import bodyParser from 'koa-bodyparser'
 import { errorHandler } from './middlewares/error-handler.js'
 import messagesRouter from './api/messages.js'
 import chatsRouter from './api/chats.js'
-import webhooksRouter from './api/webhooks.js'
+import { grafanaRouter } from './api/webhooks/index.js'
 
 const app = new Koa()
 
@@ -13,7 +13,7 @@ app.use(messagesRouter.routes())
 app.use(messagesRouter.allowedMethods())
 app.use(chatsRouter.routes())
 app.use(chatsRouter.allowedMethods())
-app.use(webhooksRouter.routes())
-app.use(webhooksRouter.allowedMethods())
+app.use(grafanaRouter.routes())
+app.use(grafanaRouter.allowedMethods())
 
 export default app
