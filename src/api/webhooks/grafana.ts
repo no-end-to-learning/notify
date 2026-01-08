@@ -117,7 +117,6 @@ function buildLarkMessage(alert: GrafanaAlert) {
       title: { tag: 'plain_text', content: title },
       template
     },
-    ...(alert.ruleUrl && { card_link: { url: alert.ruleUrl } }),
     elements
   }
 }
