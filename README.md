@@ -142,17 +142,6 @@ Content-Type: application/json
 GET /api/chats?channel=lark
 ```
 
-## 旧版 API（兼容）
-
-以下 API 保留兼容，建议迁移至新 API：
-
-| 旧 API | 新 API |
-|--------|--------|
-| POST /api/lark/message/send | POST /api/messages |
-| POST /api/lark/message/send/raw | POST /api/messages/raw |
-| POST /api/lark/message/send/grafana | POST /api/webhooks/grafana |
-| GET /api/lark/chats | GET /api/chats?channel=lark |
-
 ## 环境变量
 
 | 变量 | 说明 |
