@@ -1,70 +1,61 @@
 # Notify
 
-多渠道通知网关服务，支持飞书和企业微信。
+多渠道通知网关服务，支持飞书、企业微信和 Telegram。
 
 ## 功能
 
 - 统一 API 接口，通过 `channel` 参数切换通知渠道
 - 支持飞书卡片消息
 - 支持企业微信 Webhook 机器人
+- 支持 Telegram Bot
 - Grafana 告警集成
-- Zod 参数校验
-- TypeScript 类型安全
 
 ## 快速开始
 
-### 安装依赖
+### 构建
 
 ```bash
-npm install
+go build -o notify .
 ```
 
 ### 配置
 
-复制配置文件并填入实际凭证：
+复制环境变量示例并填入实际值：
 
 ```bash
-cp config/default.json config/local.json
+cp .env.example .env
 ```
 
-编辑 `config/local.json`：
+使用 [direnv](https://direnv.net/) 自动加载（推荐）：
 
-```json
-{
-  "server": {
-    "host": "0.0.0.0",
-    "port": 8000,
-    "baseURL": "http://localhost:8000/"
-  },
-  "lark": {
-    "appId": "your_lark_app_id",
-    "appSecret": "your_lark_app_secret"
-  },
-  "wecom": {
-    "webhookUrl": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send"
-  }
-}
+```bash
+cp .env.example .envrc
+vim .envrc  # 填入实际值
+direnv allow
+```
+
+或手动加载：
+
+```bash
+source .env
 ```
 
 ### 运行
 
 ```bash
-# 开发模式
-npm run dev
-
-# 生产构建
-npm run build
-npm start
+./notify
 ```
 
 ### Docker
 
+镜像由 CI 自动构建并推送到 Docker Hub：
+
 ```bash
-docker build -t notify .
 docker run -p 8000:8000 \
   -e APP_LARK_ID=your_app_id \
   -e APP_LARK_SECRET=your_app_secret \
-  notify
+  -e APP_TELEGRAM_BOT_TOKEN=your_bot_token \
+  your_username/notify:latest
 ```
 
 ## API 接口
@@ -93,14 +84,14 @@ Content-Type: application/json
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| channel | string | 是 | 通道类型：`lark` / `wecom` |
-| to | string | 是 | 飞书群聊 ID 或企业微信 Webhook Key |
+| channel | string | 是 | 通道类型：`lark` / `wecom` / `telegram` |
+| to | string | 是 | 飞书群聊 ID / 企业微信 Webhook Key / Telegram chat_id |
 | params.title | string | 否 | 消息标题 |
 | params.color | string | 否 | 标题颜色：Blue/Green/Orange/Grey/Red/Purple |
 | params.content | string | 否 | Markdown 内容 |
 | params.note | string | 否 | 备注 |
 | params.url | string | 否 | 跳转链接 |
-| params.image | string | 否 | 图片（飞书为 image_key，企业微信为图片 URL） |
+| params.image | string | 否 | 图片（飞书为 image_key，其他为图片 URL） |
 
 ### 发送原始消息
 
@@ -131,8 +122,7 @@ Content-Type: application/json
   "message": "当前 CPU 使用率超过 90%",
   "evalMatches": [
     { "metric": "cpu_usage", "value": 95.5 }
-  ],
-  "imageUrl": "https://..."
+  ]
 }
 ```
 
@@ -144,13 +134,15 @@ GET /api/chats?channel=lark
 
 ## 环境变量
 
-| 变量 | 说明 |
-|------|------|
-| APP_SERVER_HOST | 服务监听地址 |
-| APP_SERVER_PORT | 服务监听端口 |
-| APP_LARK_ID | 飞书应用 App ID |
-| APP_LARK_SECRET | 飞书应用 App Secret |
-| APP_WECOM_WEBHOOK_URL | 企业微信 Webhook 基础 URL |
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| APP_SERVER_HOST | 服务监听地址 | 0.0.0.0 |
+| APP_SERVER_PORT | 服务监听端口 | 8000 |
+| APP_SERVER_BASE_URL | 服务基础 URL | http://localhost:8000/ |
+| APP_LARK_ID | 飞书应用 App ID | - |
+| APP_LARK_SECRET | 飞书应用 App Secret | - |
+| APP_WECOM_WEBHOOK_URL | 企业微信 Webhook 基础 URL | https://qyapi.weixin.qq.com/cgi-bin/webhook/send |
+| APP_TELEGRAM_BOT_TOKEN | Telegram Bot Token | - |
 
 ## License
 
