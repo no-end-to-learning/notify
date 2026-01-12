@@ -106,10 +106,6 @@ func (s *TelegramService) buildMessage(params MessageParams) string {
 		parts = append(parts, EscapeMarkdown(params.Content))
 	}
 
-	if params.Image != "" {
-		parts = append(parts, fmt.Sprintf("[Image](%s)", params.Image))
-	}
-
 	if params.URL != "" {
 		parts = append(parts, fmt.Sprintf("[View Details](%s)", params.URL))
 	}

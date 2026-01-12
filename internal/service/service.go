@@ -18,9 +18,6 @@ type ChatLister interface {
 	ListChats() ([]ChatItem, error)
 }
 
-type ImageUploader interface {
-	UploadImage(imageURL string) (string, error)
-}
 
 var services map[Channel]NotifyService
 

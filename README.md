@@ -73,8 +73,7 @@ Content-Type: application/json
     "color": "Blue",
     "content": "**Markdown** 内容",
     "note": "备注信息",
-    "url": "https://example.com",
-    "image": "image_key"
+    "url": "https://example.com"
   }
 }
 ```
@@ -90,7 +89,6 @@ Content-Type: application/json
 | params.content | string | 否 | Markdown 内容 |
 | params.note | string | 否 | 备注 |
 | params.url | string | 否 | 跳转链接 |
-| params.image | string | 否 | 图片（飞书为 image_key，其他为图片 URL） |
 
 ### 发送原始消息
 

@@ -22,7 +22,6 @@ type MessageParams struct {
 	Title   string `json:"title,omitempty"`
 	Color   Color  `json:"color,omitempty"`
 	Content string `json:"content,omitempty"`
-	Image   string `json:"image,omitempty"`
 	URL     string `json:"url,omitempty"`
 	Note    string `json:"note,omitempty"`
 }

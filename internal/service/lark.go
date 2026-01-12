@@ -85,59 +85,6 @@ func (s *LarkService) SendRawMessage(to string, message any) (*SendResult, error
 	}, nil
 }
 
-func (s *LarkService) UploadImage(imageURL string) (string, error) {
-	// Download image
-	resp, err := http.Get(imageURL)
-	if err != nil {
-		return "", fmt.Errorf("download image: %w", err)
-	}
-	defer resp.Body.Close()
-
-	imageData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("read image: %w", err)
-	}
-
-	token, err := s.getTenantAccessToken()
-	if err != nil {
-		return "", fmt.Errorf("get tenant access token: %w", err)
-	}
-
-	// Upload to Lark
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-	writer.WriteField("image_type", "message")
-	part, _ := writer.CreateFormFile("image", "image.png")
-	part.Write(imageData)
-	writer.Close()
-
-	req, _ := http.NewRequest("POST", "https://open.feishu.cn/open-apis/im/v1/images", &buf)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	uploadResp, err := s.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("upload image: %w", err)
-	}
-	defer uploadResp.Body.Close()
-
-	var result struct {
-		Code int    `json:"code"`
-		Msg  string `json:"msg"`
-		Data struct {
-			ImageKey string `json:"image_key"`
-		} `json:"data"`
-	}
-	if err := json.NewDecoder(uploadResp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-
-	if result.Data.ImageKey == "" {
-		return "", fmt.Errorf("failed to upload image: %s", result.Msg)
-	}
-
-	return result.Data.ImageKey, nil
-}
 
 func (s *LarkService) ListChats() ([]ChatItem, error) {
 	token, err := s.getTenantAccessToken()
@@ -239,18 +186,6 @@ func (s *LarkService) buildCardMessage(params MessageParams) map[string]any {
 	}
 
 	elements := []any{}
-
-	if params.Image != "" {
-		alt := params.Title
-		if alt == "" {
-			alt = "image"
-		}
-		elements = append(elements, map[string]any{
-			"tag":     "img",
-			"img_key": params.Image,
-			"alt":     map[string]any{"tag": "plain_text", "content": alt},
-		})
-	}
 
 	if params.Content != "" {
 		elements = append(elements, map[string]any{
