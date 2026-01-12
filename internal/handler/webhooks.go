@@ -14,10 +14,10 @@ import (
 
 func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 	channelStr := r.URL.Query().Get("channel")
-	to := r.URL.Query().Get("to")
+	target := r.URL.Query().Get("target")
 
-	if channelStr == "" || to == "" {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and to query params are required")
+	if channelStr == "" || target == "" {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and target query params are required")
 		return
 	}
 
@@ -42,7 +42,7 @@ func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	message := formatGrafanaAlert(channel, alert)
-	taskID := queue.GetManager().Enqueue(channel, to, message)
+	taskID := queue.GetManager().Enqueue(channel, target, message)
 
 	// Mirror Lark Grafana alerts to Telegram
 	if channel == service.ChannelLark {

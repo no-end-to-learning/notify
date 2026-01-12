@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"notify/internal/config"
@@ -37,30 +38,44 @@ func (s *TelegramService) BuildMessage(params MessageParams) any {
 	}
 }
 
-func (s *TelegramService) SendMessage(to string, params MessageParams) (*SendResult, error) {
+func (s *TelegramService) SendMessage(target string, params MessageParams) (*SendResult, error) {
 	text := s.buildMessage(params)
-	return s.SendRawMessage(to, map[string]any{
+	return s.SendRawMessage(target, map[string]any{
 		"text":       text,
 		"parse_mode": "HTML",
 	})
 }
 
-func (s *TelegramService) SendRawMessage(to string, message any) (*SendResult, error) {
+func (s *TelegramService) SendRawMessage(target string, message any) (*SendResult, error) {
 	url := s.baseURL + "/sendMessage"
 
+	chatID := target
+	var threadID int
+	if idx := strings.LastIndex(target, "#"); idx != -1 {
+		chatID = target[:idx]
+		if tid, err := strconv.Atoi(target[idx+1:]); err == nil {
+			threadID = tid
+		}
+	}
+
 	payload := map[string]any{
-		"chat_id": to,
+		"chat_id": chatID,
 		"link_preview_options": map[string]bool{
 			"is_disabled": true,
 		},
 	}
+
+	if threadID != 0 {
+		payload["message_thread_id"] = threadID
+	}
+
 	if m, ok := message.(map[string]any); ok {
 		for k, v := range m {
 			payload[k] = v
 		}
 	}
 
-	slog.Info("Sending Telegram message", "to", to, slog.Any("payload", payload))
+	slog.Info("Sending Telegram message", "target", target, "chatID", chatID, "threadID", threadID, slog.Any("payload", payload))
 
 	body, _ := json.Marshal(payload)
 	resp, err := s.client.Post(url, "application/json", bytes.NewReader(body))

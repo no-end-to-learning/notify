@@ -32,13 +32,13 @@ func (s *LarkService) BuildMessage(params MessageParams) any {
 	return s.buildCardMessage(params)
 }
 
-func (s *LarkService) SendMessage(to string, params MessageParams) (*SendResult, error) {
+func (s *LarkService) SendMessage(target string, params MessageParams) (*SendResult, error) {
 	message := s.buildCardMessage(params)
-	return s.SendRawMessage(to, message)
+	return s.SendRawMessage(target, message)
 }
 
-func (s *LarkService) SendRawMessage(to string, message any) (*SendResult, error) {
-	slog.Info("Sending Lark message", "to", to, slog.Any("payload", message))
+func (s *LarkService) SendRawMessage(target string, message any) (*SendResult, error) {
+	slog.Info("Sending Lark message", "target", target, slog.Any("payload", message))
 
 	token, err := s.getTenantAccessToken()
 	if err != nil {
@@ -47,7 +47,7 @@ func (s *LarkService) SendRawMessage(to string, message any) (*SendResult, error
 
 	content, _ := json.Marshal(message)
 	reqBody := map[string]any{
-		"receive_id": to,
+		"receive_id": target,
 		"msg_type":   "interactive",
 		"content":    string(content),
 	}

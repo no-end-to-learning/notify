@@ -9,8 +9,8 @@ import (
 
 type NotifyService interface {
 	Channel() Channel
-	SendMessage(to string, params MessageParams) (*SendResult, error)
-	SendRawMessage(to string, message any) (*SendResult, error)
+	SendMessage(target string, params MessageParams) (*SendResult, error)
+	SendRawMessage(target string, message any) (*SendResult, error)
 	BuildMessage(params MessageParams) any
 }
 
