@@ -52,10 +52,10 @@ type EvalMatch struct {
 }
 
 var ColorEmoji = map[Color]string{
-	ColorBlue:   "ℹ️",
-	ColorGreen:  "✅",
-	ColorOrange: "⚠️",
-	ColorGrey:   "⏸️",
-	ColorRed:    "❌",
-	ColorPurple: "🔮",
+	ColorBlue:   "🔵",
+	ColorGreen:  "🟢",
+	ColorOrange: "🟠",
+	ColorGrey:   "⚪",
+	ColorRed:    "🔴",
+	ColorPurple: "🟣",
 }

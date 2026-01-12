@@ -33,7 +33,7 @@ func (s *TelegramService) BuildMessage(params MessageParams) any {
 	text := s.buildMessage(params)
 	return map[string]any{
 		"text":       text,
-		"parse_mode": "MarkdownV2",
+		"parse_mode": "HTML",
 	}
 }
 
@@ -41,7 +41,7 @@ func (s *TelegramService) SendMessage(to string, params MessageParams) (*SendRes
 	text := s.buildMessage(params)
 	return s.SendRawMessage(to, map[string]any{
 		"text":       text,
-		"parse_mode": "MarkdownV2",
+		"parse_mode": "HTML",
 	})
 }
 
@@ -98,54 +98,32 @@ func (s *TelegramService) buildMessage(params MessageParams) string {
 		if params.Color != "" {
 			emoji = ColorEmoji[params.Color]
 		}
-		title := EscapeMarkdown(params.Title)
-		parts = append(parts, fmt.Sprintf("*%s %s*", emoji, title))
+		title := EscapeHTML(params.Title)
+		parts = append(parts, fmt.Sprintf("<b>%s %s</b>", emoji, title))
 	}
 
 	if params.Content != "" {
-		parts = append(parts, EscapeMarkdown(params.Content))
+		parts = append(parts, EscapeHTML(params.Content))
 	}
 
 	if params.URL != "" {
-		parts = append(parts, fmt.Sprintf("[View Details](%s)", params.URL))
+		parts = append(parts, fmt.Sprintf("<a href=\"%s\">View Details</a>", params.URL))
 	}
 
 	if params.Note != "" {
-		// Use blockquote for note
-		noteLines := strings.Split(params.Note, "\n")
-		var quotedLines []string
-		for _, line := range noteLines {
-			quotedLines = append(quotedLines, "> "+EscapeMarkdown(line))
-		}
-		parts = append(parts, strings.Join(quotedLines, "\n"))
+		// Use italic for note
+		parts = append(parts, "<i>"+EscapeHTML(params.Note)+"</i>")
 	}
 
 	return strings.Join(parts, "\n\n")
 }
 
-func EscapeMarkdown(text string) string {
-	// Escape MarkdownV2 special characters
-	// Characters that need escaping: _ * [ ] ( ) ~ ` > # + - = | { } . !
+func EscapeHTML(text string) string {
+	// Escape HTML special characters
 	replacer := strings.NewReplacer(
-		"\\", "\\\\",
-		"_", "\\_",
-		"*", "\\*",
-		"[", "\\[",
-		"]", "\\]",
-		"(", "\\(",
-		")", "\\)",
-		"~", "\\~",
-		"`", "\\`",
-		">", "\\>",
-		"#", "\\#",
-		"+", "\\+",
-		"-", "\\-",
-		"=", "\\=",
-		"|", "\\|",
-		"{", "\\{",
-		"}", "\\}",
-		".", "\\.",
-		"!", "\\!",
+		"<", "&lt;",
+		">", "&gt;",
+		"&", "&amp;",
 	)
 	return replacer.Replace(text)
 }
