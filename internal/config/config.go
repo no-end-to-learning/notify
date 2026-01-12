@@ -8,7 +8,6 @@ import (
 type Config struct {
 	Server   ServerConfig
 	Lark     LarkConfig
-	Wecom    WecomConfig
 	Telegram TelegramConfig
 }
 
@@ -21,10 +20,6 @@ type ServerConfig struct {
 type LarkConfig struct {
 	AppID     string
 	AppSecret string
-}
-
-type WecomConfig struct {
-	WebhookURL string
 }
 
 type TelegramConfig struct {
@@ -41,9 +36,6 @@ func Load() *Config {
 		Lark: LarkConfig{
 			AppID:     getEnv("APP_LARK_ID", ""),
 			AppSecret: getEnv("APP_LARK_SECRET", ""),
-		},
-		Wecom: WecomConfig{
-			WebhookURL: getEnv("APP_WECOM_WEBHOOK_URL", "https://qyapi.weixin.qq.com/cgi-bin/webhook/send"),
 		},
 		Telegram: TelegramConfig{
 			BotToken: getEnv("APP_TELEGRAM_BOT_TOKEN", ""),

@@ -33,7 +33,7 @@ func (s *TelegramService) SendMessage(to string, params MessageParams) (*SendRes
 	text := s.buildMessage(params)
 	return s.SendRawMessage(to, map[string]any{
 		"text":       text,
-		"parse_mode": "HTML",
+		"parse_mode": "MarkdownV2",
 	})
 }
 
@@ -49,7 +49,7 @@ func (s *TelegramService) SendRawMessage(to string, message any) (*SendResult, e
 		}
 	}
 
-	slog.Info("Sending Telegram message", "to", to, "message", payload)
+	slog.Info("Sending Telegram message", "to", to, slog.Any("payload", payload))
 
 	body, _ := json.Marshal(payload)
 	resp, err := s.client.Post(url, "application/json", bytes.NewReader(body))
@@ -88,32 +88,58 @@ func (s *TelegramService) buildMessage(params MessageParams) string {
 		if params.Color != "" {
 			emoji = ColorEmoji[params.Color]
 		}
-		title := escapeHTML(params.Title)
-		parts = append(parts, fmt.Sprintf("<b>%s %s</b>", emoji, title))
+		title := escapeMarkdown(params.Title)
+		parts = append(parts, fmt.Sprintf("*%s %s*", emoji, title))
 	}
 
 	if params.Content != "" {
-		parts = append(parts, escapeHTML(params.Content))
+		parts = append(parts, escapeMarkdown(params.Content))
 	}
 
 	if params.Image != "" {
-		parts = append(parts, fmt.Sprintf(`<a href="%s">[Image]</a>`, escapeHTML(params.Image)))
+		parts = append(parts, fmt.Sprintf("[Image](%s)", params.Image))
 	}
 
 	if params.URL != "" {
-		parts = append(parts, fmt.Sprintf(`<a href="%s">View Details</a>`, escapeHTML(params.URL)))
+		parts = append(parts, fmt.Sprintf("[View Details](%s)", params.URL))
 	}
 
 	if params.Note != "" {
-		parts = append(parts, fmt.Sprintf("<i>%s</i>", escapeHTML(params.Note)))
+		// Use blockquote for note
+		noteLines := strings.Split(params.Note, "\n")
+		var quotedLines []string
+		for _, line := range noteLines {
+			quotedLines = append(quotedLines, "> "+escapeMarkdown(line))
+		}
+		parts = append(parts, strings.Join(quotedLines, "\n"))
 	}
 
 	return strings.Join(parts, "\n\n")
 }
 
-func escapeHTML(text string) string {
-	text = strings.ReplaceAll(text, "&", "&amp;")
-	text = strings.ReplaceAll(text, "<", "&lt;")
-	text = strings.ReplaceAll(text, ">", "&gt;")
-	return text
+func escapeMarkdown(text string) string {
+	// Escape MarkdownV2 special characters
+	// Characters that need escaping: _ * [ ] ( ) ~ ` > # + - = | { } . !
+	replacer := strings.NewReplacer(
+		"\\", "\\\\",
+		"_", "\\_",
+		"*", "\\*",
+		"[", "\\[",
+		"]", "\\]",
+		"(", "\\(",
+		")", "\\)",
+		"~", "\\~",
+		"`", "\\`",
+		">", "\\>",
+		"#", "\\#",
+		"+", "\\+",
+		"-", "\\-",
+		"=", "\\=",
+		"|", "\\|",
+		"{", "\\{",
+		"}", "\\}",
+		".", "\\.",
+		"!", "\\!",
+	)
+	return replacer.Replace(text)
 }
