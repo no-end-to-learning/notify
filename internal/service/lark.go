@@ -30,6 +30,10 @@ func (s *LarkService) Channel() Channel {
 	return ChannelLark
 }
 
+func (s *LarkService) BuildMessage(params MessageParams) any {
+	return s.buildCardMessage(params)
+}
+
 func (s *LarkService) SendMessage(to string, params MessageParams) (*SendResult, error) {
 	message := s.buildCardMessage(params)
 	return s.SendRawMessage(to, message)
@@ -77,8 +81,7 @@ func (s *LarkService) SendRawMessage(to string, message any) (*SendResult, error
 	}
 
 	return &SendResult{
-		MessageID: result.Data.MessageID,
-		Success:   true,
+		Success: true,
 	}, nil
 }
 

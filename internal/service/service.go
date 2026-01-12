@@ -11,6 +11,7 @@ type NotifyService interface {
 	Channel() Channel
 	SendMessage(to string, params MessageParams) (*SendResult, error)
 	SendRawMessage(to string, message any) (*SendResult, error)
+	BuildMessage(params MessageParams) any
 }
 
 type ChatLister interface {

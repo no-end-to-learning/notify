@@ -3,12 +3,14 @@ package config
 import (
 	"os"
 	"strconv"
+	"time"
 )
 
 type Config struct {
 	Server   ServerConfig
 	Lark     LarkConfig
 	Telegram TelegramConfig
+	Queue    QueueConfig
 }
 
 type ServerConfig struct {
@@ -23,7 +25,14 @@ type LarkConfig struct {
 }
 
 type TelegramConfig struct {
-	BotToken string
+	BotToken   string
+	MirrorChat string
+}
+
+type QueueConfig struct {
+	RatePerSecond float64
+	MaxRetries    int
+	RetryDelay    time.Duration
 }
 
 func Load() *Config {
@@ -38,7 +47,13 @@ func Load() *Config {
 			AppSecret: getEnv("APP_LARK_SECRET", ""),
 		},
 		Telegram: TelegramConfig{
-			BotToken: getEnv("APP_TELEGRAM_BOT_TOKEN", ""),
+			BotToken:   getEnv("APP_TELEGRAM_BOT_TOKEN", ""),
+			MirrorChat: getEnv("APP_TELEGRAM_MIRROR_CHAT", ""),
+		},
+		Queue: QueueConfig{
+			RatePerSecond: 1.0,
+			MaxRetries:    3,
+			RetryDelay:    time.Second,
 		},
 	}
 }
