@@ -94,12 +94,8 @@ func (s *TelegramService) buildMessage(params MessageParams) string {
 	var parts []string
 
 	if params.Title != "" {
-		emoji := ""
-		if params.Color != "" {
-			emoji = ColorEmoji[params.Color]
-		}
 		title := EscapeHTML(params.Title)
-		parts = append(parts, fmt.Sprintf("<b>%s %s</b>", emoji, title))
+		parts = append(parts, fmt.Sprintf("<b>%s</b>", title))
 	}
 
 	if params.Content != "" {
