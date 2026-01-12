@@ -16,7 +16,7 @@ import (
 type Task struct {
 	ID        string
 	Channel   service.Channel
-	To        string
+	Target    string
 	Message   any
 	Attempts  int
 	CreatedAt time.Time
@@ -57,7 +57,7 @@ func GetManager() *Manager {
 	return manager
 }
 
-func (m *Manager) Enqueue(channel service.Channel, to string, message any) string {
+func (m *Manager) Enqueue(channel service.Channel, target string, message any) string {
 	m.taskSeqMu.Lock()
 	m.taskSeq++
 	taskID := fmt.Sprintf("task_%d_%d", time.Now().UnixNano(), m.taskSeq)
@@ -66,13 +66,13 @@ func (m *Manager) Enqueue(channel service.Channel, to string, message any) strin
 	task := &Task{
 		ID:        taskID,
 		Channel:   channel,
-		To:        to,
+		Target:    target,
 		Message:   message,
 		Attempts:  0,
 		CreatedAt: time.Now(),
 	}
 
-	key := fmt.Sprintf("%s:%s", channel, to)
+	key := fmt.Sprintf("%s:%s", channel, target)
 
 	m.mu.Lock()
 	tq, exists := m.queues[key]
@@ -99,9 +99,9 @@ func (m *Manager) Enqueue(channel service.Channel, to string, message any) strin
 	// Send to channel while holding the lock to prevent race with worker shutdown
 	select {
 	case tq.tasks <- task:
-		slog.Info("Task enqueued", "taskId", taskID, "channel", channel, "to", to)
+		slog.Info("Task enqueued", "taskId", taskID, "channel", channel, "target", target)
 	default:
-		slog.Warn("Queue full, task dropped", "taskId", taskID, "channel", channel, "to", to)
+		slog.Warn("Queue full, task dropped", "taskId", taskID, "channel", channel, "target", target)
 	}
 	m.mu.Unlock()
 
@@ -146,7 +146,7 @@ func (m *Manager) processTask(tq *targetQueue, task *Task) {
 
 	for task.Attempts < m.cfg.MaxRetries {
 		task.Attempts++
-		_, err := tq.svc.SendRawMessage(task.To, task.Message)
+		_, err := tq.svc.SendRawMessage(task.Target, task.Message)
 		if err == nil {
 			slog.Info("Message sent", "taskId", task.ID, "attempt", task.Attempts)
 			return

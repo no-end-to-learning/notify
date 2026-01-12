@@ -10,13 +10,13 @@ import (
 
 type SendMessageRequest struct {
 	Channel string                `json:"channel"`
-	To      string                `json:"to"`
+	Target  string                `json:"target"`
 	Params  service.MessageParams `json:"params"`
 }
 
 type SendRawMessageRequest struct {
 	Channel string         `json:"channel"`
-	To      string         `json:"to"`
+	Target  string         `json:"target"`
 	Message map[string]any `json:"message"`
 }
 
@@ -32,8 +32,8 @@ func SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Channel == "" || req.To == "" {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and to are required")
+	if req.Channel == "" || req.Target == "" {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and target are required")
 		return
 	}
 
@@ -50,7 +50,7 @@ func SendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	message := svc.BuildMessage(req.Params)
-	taskID := queue.GetManager().Enqueue(channel, req.To, message)
+	taskID := queue.GetManager().Enqueue(channel, req.Target, message)
 
 	// Mirror Lark messages to Telegram
 	if channel == service.ChannelLark {
@@ -70,8 +70,8 @@ func SendRawMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Channel == "" || req.To == "" {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and to are required")
+	if req.Channel == "" || req.Target == "" {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and target are required")
 		return
 	}
 
@@ -87,7 +87,7 @@ func SendRawMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	taskID := queue.GetManager().Enqueue(channel, req.To, req.Message)
+	taskID := queue.GetManager().Enqueue(channel, req.Target, req.Message)
 
 	writeJSON(w, http.StatusOK, &service.SendResult{
 		TaskID:  taskID,
