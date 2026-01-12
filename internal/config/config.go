@@ -51,9 +51,9 @@ func Load() *Config {
 			MirrorChat: getEnv("APP_TELEGRAM_MIRROR_CHAT", ""),
 		},
 		Queue: QueueConfig{
-			RatePerSecond: 1.0,
-			MaxRetries:    3,
-			RetryDelay:    time.Second,
+			RatePerSecond: getEnvFloat("QUEUE_RATE_LIMIT", 1.0),
+			MaxRetries:    getEnvInt("QUEUE_MAX_RETRIES", 3),
+			RetryDelay:    getEnvDuration("QUEUE_RETRY_DELAY", time.Second),
 		},
 	}
 }
@@ -69,6 +69,24 @@ func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intVal, err := strconv.Atoi(value); err == nil {
 			return intVal
+		}
+	}
+	return defaultValue
+}
+
+func getEnvFloat(key string, defaultValue float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+			return floatVal
+		}
+	}
+	return defaultValue
+}
+
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if durationVal, err := time.ParseDuration(value); err == nil {
+			return durationVal
 		}
 	}
 	return defaultValue

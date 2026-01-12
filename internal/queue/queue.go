@@ -20,6 +20,7 @@ type Task struct {
 	Message   any
 	Attempts  int
 	CreatedAt time.Time
+	LastError string
 }
 
 type targetQueue struct {
@@ -94,14 +95,15 @@ func (m *Manager) Enqueue(channel service.Channel, to string, message any) strin
 		m.wg.Add(1)
 		go m.runWorker(tq)
 	}
-	m.mu.Unlock()
 
+	// Send to channel while holding the lock to prevent race with worker shutdown
 	select {
 	case tq.tasks <- task:
 		slog.Info("Task enqueued", "taskId", taskID, "channel", channel, "to", to)
 	default:
 		slog.Warn("Queue full, task dropped", "taskId", taskID, "channel", channel, "to", to)
 	}
+	m.mu.Unlock()
 
 	return taskID
 }
@@ -124,6 +126,7 @@ func (m *Manager) runWorker(tq *targetQueue) {
 
 		case <-idleTimer.C:
 			m.mu.Lock()
+			// Check if queue is empty while holding lock
 			if len(tq.tasks) == 0 {
 				delete(m.queues, tq.key)
 				m.mu.Unlock()
@@ -148,13 +151,14 @@ func (m *Manager) processTask(tq *targetQueue, task *Task) {
 			slog.Info("Message sent", "taskId", task.ID, "attempt", task.Attempts)
 			return
 		}
+		task.LastError = err.Error()
 		slog.Warn("Send failed", "taskId", task.ID, "attempt", task.Attempts, "error", err)
 
 		if task.Attempts < m.cfg.MaxRetries {
 			time.Sleep(m.cfg.RetryDelay)
 		}
 	}
-	slog.Error("Send failed after retries", "taskId", task.ID, "attempts", m.cfg.MaxRetries)
+	slog.Error("Send failed after retries", "taskId", task.ID, "attempts", m.cfg.MaxRetries, "lastError", task.LastError)
 }
 
 func (m *Manager) drainQueue(tq *targetQueue) {
