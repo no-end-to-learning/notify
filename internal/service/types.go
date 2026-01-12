@@ -4,7 +4,6 @@ type Channel string
 
 const (
 	ChannelLark     Channel = "lark"
-	ChannelWecom    Channel = "wecom"
 	ChannelTelegram Channel = "telegram"
 )
 
@@ -40,12 +39,12 @@ type ChatItem struct {
 }
 
 type GrafanaAlert struct {
-	State       string       `json:"state"`
-	RuleName    string       `json:"ruleName"`
-	RuleURL     string       `json:"ruleUrl,omitempty"`
-	Message     string       `json:"message,omitempty"`
-	ImageURL    string       `json:"imageUrl,omitempty"`
-	EvalMatches []EvalMatch  `json:"evalMatches,omitempty"`
+	State       string      `json:"state"`
+	RuleName    string      `json:"ruleName"`
+	RuleURL     string      `json:"ruleUrl,omitempty"`
+	Message     string      `json:"message,omitempty"`
+	ImageURL    string      `json:"imageUrl,omitempty"`
+	EvalMatches []EvalMatch `json:"evalMatches,omitempty"`
 }
 
 type EvalMatch struct {

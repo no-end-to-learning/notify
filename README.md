@@ -1,12 +1,11 @@
 # Notify
 
-多渠道通知网关服务，支持飞书、企业微信和 Telegram。
+多渠道通知网关服务，支持飞书和 Telegram。
 
 ## 功能
 
 - 统一 API 接口，通过 `channel` 参数切换通知渠道
 - 支持飞书卡片消息
-- 支持企业微信 Webhook 机器人
 - 支持 Telegram Bot
 - Grafana 告警集成
 
@@ -84,8 +83,8 @@ Content-Type: application/json
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| channel | string | 是 | 通道类型：`lark` / `wecom` / `telegram` |
-| to | string | 是 | 飞书群聊 ID / 企业微信 Webhook Key / Telegram chat_id |
+| channel | string | 是 | 通道类型：`lark` / `telegram` |
+| to | string | 是 | 飞书群聊 ID / Telegram chat_id |
 | params.title | string | 否 | 消息标题 |
 | params.color | string | 否 | 标题颜色：Blue/Green/Orange/Grey/Red/Purple |
 | params.content | string | 否 | Markdown 内容 |
@@ -141,7 +140,6 @@ GET /api/chats?channel=lark
 | APP_SERVER_BASE_URL | 服务基础 URL | http://localhost:8000/ |
 | APP_LARK_ID | 飞书应用 App ID | - |
 | APP_LARK_SECRET | 飞书应用 App Secret | - |
-| APP_WECOM_WEBHOOK_URL | 企业微信 Webhook 基础 URL | https://qyapi.weixin.qq.com/cgi-bin/webhook/send |
 | APP_TELEGRAM_BOT_TOKEN | Telegram Bot Token | - |
 
 ## License

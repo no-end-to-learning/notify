@@ -11,7 +11,7 @@ import (
 	"notify/internal/service"
 )
 
-func GrafanaWebhook(w http.ResponseWriter, r *http.Request) {
+func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 	channelStr := r.URL.Query().Get("channel")
 	to := r.URL.Query().Get("to")
 
@@ -32,7 +32,7 @@ func GrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("Grafana alert received", "alert", alert)
+	slog.Info("Grafana alert received", slog.Any("alert", alert))
 
 	svc, err := service.GetService(channel)
 	if err != nil {
@@ -40,7 +40,7 @@ func GrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	message := buildGrafanaMessage(channel, alert)
+	message := formatGrafanaAlert(channel, alert)
 	result, err := svc.SendRawMessage(to, message)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "SERVICE_ERROR", err.Error())
@@ -50,63 +50,16 @@ func GrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
-func buildGrafanaMessage(channel service.Channel, alert service.GrafanaAlert) any {
+func formatGrafanaAlert(channel service.Channel, alert service.GrafanaAlert) any {
 	switch channel {
-	case service.ChannelWecom:
-		return buildWecomGrafanaMessage(alert)
 	case service.ChannelTelegram:
-		return buildTelegramGrafanaMessage(alert)
+		return formatGrafanaAlertForTelegram(alert)
 	default:
-		return buildLarkGrafanaMessage(alert)
+		return formatGrafanaAlertForLark(alert)
 	}
 }
 
-func buildWecomGrafanaMessage(alert service.GrafanaAlert) map[string]any {
-	stateEmoji := map[string]string{
-		"alerting": "⚠️",
-		"ok":       "✅",
-	}
-	emoji := stateEmoji[alert.State]
-	if emoji == "" {
-		emoji = "📢"
-	}
-
-	var parts []string
-	parts = append(parts, fmt.Sprintf("### %s %s", emoji, alert.RuleName))
-
-	if len(alert.EvalMatches) > 0 {
-		parts = append(parts, `<font color="comment">──────────</font>`)
-		var items []string
-		for _, item := range alert.EvalMatches {
-			items = append(items, fmt.Sprintf("%s: %v", item.Metric, item.Value))
-		}
-		parts = append(parts, strings.Join(items, "\n"))
-	}
-
-	if alert.Message != "" {
-		parts = append(parts, `<font color="comment">──────────</font>`)
-		lines := strings.Split(alert.Message, "\n")
-		var coloredLines []string
-		for _, line := range lines {
-			trimmed := strings.TrimPrefix(line, "- ")
-			coloredLines = append(coloredLines, fmt.Sprintf(`<font color="comment">%s</font>`, trimmed))
-		}
-		parts = append(parts, strings.Join(coloredLines, "\n"))
-	}
-
-	if len(parts) == 1 {
-		parts = append(parts, fmt.Sprintf("> %s", time.Now().String()))
-	}
-
-	return map[string]any{
-		"msgtype": "markdown",
-		"markdown": map[string]any{
-			"content": strings.Join(parts, "\n"),
-		},
-	}
-}
-
-func buildLarkGrafanaMessage(alert service.GrafanaAlert) map[string]any {
+func formatGrafanaAlertForLark(alert service.GrafanaAlert) map[string]any {
 	var elements []any
 	var template, title string
 
@@ -160,7 +113,7 @@ func buildLarkGrafanaMessage(alert service.GrafanaAlert) map[string]any {
 	}
 }
 
-func buildTelegramGrafanaMessage(alert service.GrafanaAlert) map[string]any {
+func formatGrafanaAlertForTelegram(alert service.GrafanaAlert) map[string]any {
 	stateEmoji := map[string]string{
 		"alerting": "⚠️",
 		"ok":       "✅",

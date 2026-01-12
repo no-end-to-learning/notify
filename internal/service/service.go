@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"strings"
 
 	"notify/internal/config"
 )
@@ -25,7 +26,6 @@ var services map[Channel]NotifyService
 func Init(cfg *config.Config) {
 	services = map[Channel]NotifyService{
 		ChannelLark:     NewLarkService(cfg.Lark),
-		ChannelWecom:    NewWecomService(cfg.Wecom),
 		ChannelTelegram: NewTelegramService(cfg.Telegram),
 	}
 }
@@ -39,9 +39,9 @@ func GetService(channel Channel) (NotifyService, error) {
 }
 
 func ValidateChannel(s string) (Channel, error) {
-	switch Channel(s) {
-	case ChannelLark, ChannelWecom, ChannelTelegram:
-		return Channel(s), nil
+	switch Channel(strings.ToLower(s)) {
+	case ChannelLark, ChannelTelegram:
+		return Channel(strings.ToLower(s)), nil
 	default:
 		return "", fmt.Errorf("invalid channel: %s", s)
 	}

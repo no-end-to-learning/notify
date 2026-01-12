@@ -36,7 +36,7 @@ func (s *LarkService) SendMessage(to string, params MessageParams) (*SendResult,
 }
 
 func (s *LarkService) SendRawMessage(to string, message any) (*SendResult, error) {
-	slog.Info("Sending Lark message", "to", to, "message", message)
+	slog.Info("Sending Lark message", "to", to, slog.Any("payload", message))
 
 	token, err := s.getTenantAccessToken()
 	if err != nil {

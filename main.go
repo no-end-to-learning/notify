@@ -13,7 +13,7 @@ import (
 
 func main() {
 	// Setup structured logging
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 	slog.SetDefault(logger)
@@ -31,7 +31,7 @@ func main() {
 	mux.HandleFunc("POST /api/messages", handler.SendMessage)
 	mux.HandleFunc("POST /api/messages/raw", handler.SendRawMessage)
 	mux.HandleFunc("GET /api/chats", handler.ListChats)
-	mux.HandleFunc("POST /api/webhooks/grafana", handler.GrafanaWebhook)
+	mux.HandleFunc("POST /api/webhooks/grafana", handler.HandleGrafanaWebhook)
 
 	// Start server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
