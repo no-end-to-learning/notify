@@ -130,13 +130,13 @@ func formatGrafanaAlertForTelegram(alert service.GrafanaAlert) map[string]any {
 
 	var parts []string
 	// Title: Bold
-	parts = append(parts, fmt.Sprintf("*%s %s*", emoji, service.EscapeMarkdown(alert.RuleName)))
+	parts = append(parts, fmt.Sprintf("<b>%s %s</b>", emoji, service.EscapeHTML(alert.RuleName)))
 
 	// Content: EvalMatches
 	if len(alert.EvalMatches) > 0 {
 		var items []string
 		for _, item := range alert.EvalMatches {
-			items = append(items, fmt.Sprintf("%s: %v", service.EscapeMarkdown(item.Metric), item.Value))
+			items = append(items, fmt.Sprintf("%s: %v", service.EscapeHTML(item.Metric), item.Value))
 		}
 		parts = append(parts, strings.Join(items, "\n"))
 	}
@@ -146,17 +146,17 @@ func formatGrafanaAlertForTelegram(alert service.GrafanaAlert) map[string]any {
 		noteLines := strings.Split(alert.Message, "\n")
 		var quotedLines []string
 		for _, line := range noteLines {
-			quotedLines = append(quotedLines, "> "+service.EscapeMarkdown(line))
+			quotedLines = append(quotedLines, "&gt; "+service.EscapeHTML(line))
 		}
 		parts = append(parts, strings.Join(quotedLines, "\n"))
 	}
 
 	if len(parts) == 1 {
-		parts = append(parts, service.EscapeMarkdown(time.Now().String()))
+		parts = append(parts, service.EscapeHTML(time.Now().String()))
 	}
 
 	return map[string]any{
 		"text":       strings.Join(parts, "\n\n"),
-		"parse_mode": "MarkdownV2",
+		"parse_mode": "HTML",
 	}
 }
