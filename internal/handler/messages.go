@@ -11,12 +11,14 @@ import (
 type SendMessageRequest struct {
 	Channel string                `json:"channel"`
 	Target  string                `json:"target"`
+	To      string                `json:"to"` // Deprecated: use target instead
 	Params  service.MessageParams `json:"params"`
 }
 
 type SendRawMessageRequest struct {
 	Channel string         `json:"channel"`
 	Target  string         `json:"target"`
+	To      string         `json:"to"` // Deprecated: use target instead
 	Message map[string]any `json:"message"`
 }
 
@@ -32,8 +34,13 @@ func SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Compatibility: use To if Target is empty
+	if req.Target == "" && req.To != "" {
+		req.Target = req.To
+	}
+
 	if req.Channel == "" || req.Target == "" {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and target are required")
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and target (or to) are required")
 		return
 	}
 
@@ -70,8 +77,13 @@ func SendRawMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Compatibility: use To if Target is empty
+	if req.Target == "" && req.To != "" {
+		req.Target = req.To
+	}
+
 	if req.Channel == "" || req.Target == "" {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and target are required")
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and target (or to) are required")
 		return
 	}
 
