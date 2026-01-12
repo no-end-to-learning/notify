@@ -141,14 +141,9 @@ func formatGrafanaAlertForTelegram(alert service.GrafanaAlert) map[string]any {
 		parts = append(parts, strings.Join(items, "\n"))
 	}
 
-	// Note: Message (Blockquote)
+	// Note: Message (Italic)
 	if alert.Message != "" {
-		noteLines := strings.Split(alert.Message, "\n")
-		var quotedLines []string
-		for _, line := range noteLines {
-			quotedLines = append(quotedLines, "&gt; "+service.EscapeHTML(line))
-		}
-		parts = append(parts, strings.Join(quotedLines, "\n"))
+		parts = append(parts, "<i>"+service.EscapeHTML(alert.Message)+"</i>")
 	}
 
 	if len(parts) == 1 {
