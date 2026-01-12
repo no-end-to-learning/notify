@@ -83,7 +83,7 @@ Content-Type: application/json
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | channel | string | 是 | 通道类型：`lark` / `telegram` |
-| target | string | 是 | 接收目标。飞书为 `chat_id`；Telegram 为 `chat_id` 或 `chat_id#topic_id`（支持群组 Topic）。兼容旧参数 `to`。 |
+| target | string | 是 | 接收目标。飞书为 `chat_id`；Telegram 为 `chat_id` 或 `chat_id:topic_id`（支持群组 Topic）。兼容旧参数 `to`。 |
 | params.title | string | 否 | 消息标题 |
 | params.color | string | 否 | 标题颜色：Blue/Green/Orange/Grey/Red/Purple (Telegram 消息忽略此字段) |
 | params.content | string | 否 | Markdown 内容 |

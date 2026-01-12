@@ -51,7 +51,7 @@ func (s *TelegramService) SendRawMessage(target string, message any) (*SendResul
 
 	chatID := target
 	var threadID int
-	if idx := strings.LastIndex(target, "#"); idx != -1 {
+	if idx := strings.LastIndex(target, ":"); idx != -1 {
 		chatID = target[:idx]
 		if tid, err := strconv.Atoi(target[idx+1:]); err == nil {
 			threadID = tid
