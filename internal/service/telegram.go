@@ -50,6 +50,9 @@ func (s *TelegramService) SendRawMessage(to string, message any) (*SendResult, e
 
 	payload := map[string]any{
 		"chat_id": to,
+		"link_preview_options": map[string]bool{
+			"is_disabled": true,
+		},
 	}
 	if m, ok := message.(map[string]any); ok {
 		for k, v := range m {
@@ -95,12 +98,12 @@ func (s *TelegramService) buildMessage(params MessageParams) string {
 		if params.Color != "" {
 			emoji = ColorEmoji[params.Color]
 		}
-		title := escapeMarkdown(params.Title)
+		title := EscapeMarkdown(params.Title)
 		parts = append(parts, fmt.Sprintf("*%s %s*", emoji, title))
 	}
 
 	if params.Content != "" {
-		parts = append(parts, escapeMarkdown(params.Content))
+		parts = append(parts, EscapeMarkdown(params.Content))
 	}
 
 	if params.Image != "" {
@@ -116,7 +119,7 @@ func (s *TelegramService) buildMessage(params MessageParams) string {
 		noteLines := strings.Split(params.Note, "\n")
 		var quotedLines []string
 		for _, line := range noteLines {
-			quotedLines = append(quotedLines, "> "+escapeMarkdown(line))
+			quotedLines = append(quotedLines, "> "+EscapeMarkdown(line))
 		}
 		parts = append(parts, strings.Join(quotedLines, "\n"))
 	}
@@ -124,7 +127,7 @@ func (s *TelegramService) buildMessage(params MessageParams) string {
 	return strings.Join(parts, "\n\n")
 }
 
-func escapeMarkdown(text string) string {
+func EscapeMarkdown(text string) string {
 	// Escape MarkdownV2 special characters
 	// Characters that need escaping: _ * [ ] ( ) ~ ` > # + - = | { } . !
 	replacer := strings.NewReplacer(

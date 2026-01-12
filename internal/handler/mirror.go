@@ -27,12 +27,8 @@ func mirrorToTelegram(params service.MessageParams) {
 		return
 	}
 
-	// Add mirror prefix
-	mirrorParams := params
-	mirrorParams.Title = "[Lark Mirror] " + params.Title
-
 	// Build message and enqueue through queue for rate limiting
-	message := svc.BuildMessage(mirrorParams)
+	message := svc.BuildMessage(params)
 	queue.GetManager().Enqueue(service.ChannelTelegram, mirrorChat, message)
 }
 
@@ -43,10 +39,6 @@ func mirrorGrafanaAlertToTelegram(alert service.GrafanaAlert) {
 
 	// Build Telegram format message and enqueue
 	message := formatGrafanaAlertForTelegram(alert)
-	// Add mirror prefix
-	if text, ok := message["text"].(string); ok {
-		message["text"] = "[Lark Mirror]\n\n" + text
-	}
 
 	queue.GetManager().Enqueue(service.ChannelTelegram, mirrorChat, message)
 }
