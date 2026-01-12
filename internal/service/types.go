@@ -28,8 +28,8 @@ type MessageParams struct {
 }
 
 type SendResult struct {
-	MessageID string `json:"messageId,omitempty"`
-	Success   bool   `json:"success"`
+	TaskID  string `json:"taskId,omitempty"`
+	Success bool   `json:"success"`
 }
 
 type ChatItem struct {

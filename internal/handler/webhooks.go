@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"notify/internal/queue"
 	"notify/internal/service"
 )
 
@@ -34,20 +35,24 @@ func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Grafana alert received", slog.Any("alert", alert))
 
-	svc, err := service.GetService(channel)
+	_, err = service.GetService(channel)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "NOT_FOUND", err.Error())
 		return
 	}
 
 	message := formatGrafanaAlert(channel, alert)
-	result, err := svc.SendRawMessage(to, message)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, "SERVICE_ERROR", err.Error())
-		return
+	taskID := queue.GetManager().Enqueue(channel, to, message)
+
+	// Mirror Lark Grafana alerts to Telegram
+	if channel == service.ChannelLark {
+		mirrorGrafanaAlertToTelegram(alert)
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	writeJSON(w, http.StatusOK, &service.SendResult{
+		TaskID:  taskID,
+		Success: true,
+	})
 }
 
 func formatGrafanaAlert(channel service.Channel, alert service.GrafanaAlert) any {

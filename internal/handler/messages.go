@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"notify/internal/queue"
 	"notify/internal/service"
 )
 
@@ -48,13 +49,18 @@ func SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := svc.SendMessage(req.To, req.Params)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, "SERVICE_ERROR", err.Error())
-		return
+	message := svc.BuildMessage(req.Params)
+	taskID := queue.GetManager().Enqueue(channel, req.To, message)
+
+	// Mirror Lark messages to Telegram
+	if channel == service.ChannelLark {
+		mirrorToTelegram(req.Params)
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	writeJSON(w, http.StatusOK, &service.SendResult{
+		TaskID:  taskID,
+		Success: true,
+	})
 }
 
 func SendRawMessage(w http.ResponseWriter, r *http.Request) {
@@ -75,19 +81,18 @@ func SendRawMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, err := service.GetService(channel)
+	_, err = service.GetService(channel)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "NOT_FOUND", err.Error())
 		return
 	}
 
-	result, err := svc.SendRawMessage(req.To, req.Message)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, "SERVICE_ERROR", err.Error())
-		return
-	}
+	taskID := queue.GetManager().Enqueue(channel, req.To, req.Message)
 
-	writeJSON(w, http.StatusOK, result)
+	writeJSON(w, http.StatusOK, &service.SendResult{
+		TaskID:  taskID,
+		Success: true,
+	})
 }
 
 func ListChats(w http.ResponseWriter, r *http.Request) {

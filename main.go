@@ -5,9 +5,12 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"notify/internal/config"
 	"notify/internal/handler"
+	"notify/internal/queue"
 	"notify/internal/service"
 )
 
@@ -24,6 +27,12 @@ func main() {
 	// Initialize services
 	service.Init(cfg)
 
+	// Initialize queue
+	queue.Init(cfg.Queue)
+
+	// Initialize mirror
+	handler.InitMirror(cfg.Telegram.MirrorChat)
+
 	// Setup routes
 	mux := http.NewServeMux()
 
@@ -32,6 +41,16 @@ func main() {
 	mux.HandleFunc("POST /api/messages/raw", handler.SendRawMessage)
 	mux.HandleFunc("GET /api/chats", handler.ListChats)
 	mux.HandleFunc("POST /api/webhooks/grafana", handler.HandleGrafanaWebhook)
+
+	// Graceful shutdown
+	go func() {
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		<-quit
+		slog.Info("Shutting down server...")
+		queue.GetManager().Shutdown()
+		os.Exit(0)
+	}()
 
 	// Start server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

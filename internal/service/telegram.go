@@ -29,6 +29,14 @@ func (s *TelegramService) Channel() Channel {
 	return ChannelTelegram
 }
 
+func (s *TelegramService) BuildMessage(params MessageParams) any {
+	text := s.buildMessage(params)
+	return map[string]any{
+		"text":       text,
+		"parse_mode": "MarkdownV2",
+	}
+}
+
 func (s *TelegramService) SendMessage(to string, params MessageParams) (*SendResult, error) {
 	text := s.buildMessage(params)
 	return s.SendRawMessage(to, map[string]any{
@@ -75,8 +83,7 @@ func (s *TelegramService) SendRawMessage(to string, message any) (*SendResult, e
 	}
 
 	return &SendResult{
-		Success:   true,
-		MessageID: fmt.Sprintf("%d", result.Result.MessageID),
+		Success: true,
 	}, nil
 }
 
