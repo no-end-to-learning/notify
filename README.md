@@ -67,7 +67,7 @@ Content-Type: application/json
 
 {
   "channel": "lark",
-  "to": "oc_xxx",
+  "target": "oc_xxx",
   "params": {
     "title": "消息标题",
     "color": "Blue",
@@ -83,9 +83,9 @@ Content-Type: application/json
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | channel | string | 是 | 通道类型：`lark` / `telegram` |
-| to | string | 是 | 飞书群聊 ID / Telegram chat_id |
+| target | string | 是 | 接收目标。飞书为 `chat_id`；Telegram 为 `chat_id` 或 `chat_id#topic_id`（支持群组 Topic）。兼容旧参数 `to`。 |
 | params.title | string | 否 | 消息标题 |
-| params.color | string | 否 | 标题颜色：Blue/Green/Orange/Grey/Red/Purple |
+| params.color | string | 否 | 标题颜色：Blue/Green/Orange/Grey/Red/Purple (Telegram 消息忽略此字段) |
 | params.content | string | 否 | Markdown 内容 |
 | params.note | string | 否 | 备注 |
 | params.url | string | 否 | 跳转链接 |
@@ -98,7 +98,7 @@ Content-Type: application/json
 
 {
   "channel": "lark",
-  "to": "oc_xxx",
+  "target": "oc_xxx",
   "message": {
     "config": { "wide_screen_mode": true },
     "header": { ... },
@@ -110,7 +110,7 @@ Content-Type: application/json
 ### Grafana 告警
 
 ```
-POST /api/webhooks/grafana?channel=lark&to=oc_xxx
+POST /api/webhooks/grafana?channel=lark&target=oc_xxx
 Content-Type: application/json
 
 {
@@ -139,6 +139,10 @@ GET /api/chats?channel=lark
 | APP_LARK_ID | 飞书应用 App ID | - |
 | APP_LARK_SECRET | 飞书应用 App Secret | - |
 | APP_TELEGRAM_BOT_TOKEN | Telegram Bot Token | - |
+| APP_TELEGRAM_MIRROR_CHAT | Telegram 镜像群组 ID | - |
+| QUEUE_RATE_LIMIT | 发送速率限制 (个/秒) | 1.0 |
+| QUEUE_MAX_RETRIES | 最大重试次数 | 3 |
+| QUEUE_RETRY_DELAY | 重试延迟时间 | 1s |
 
 ## License
 
