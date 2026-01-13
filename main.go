@@ -7,6 +7,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"github.com/lmittmann/tint"
 
 	"notify/internal/config"
 	"notify/internal/handler"
@@ -15,9 +18,10 @@ import (
 )
 
 func main() {
-	// Setup structured logging
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+	// Setup structured logging with color support
+	logger := slog.New(tint.NewHandler(os.Stdout, &tint.Options{
+		Level:      slog.LevelInfo,
+		TimeFormat: time.TimeOnly,
 	}))
 	slog.SetDefault(logger)
 
