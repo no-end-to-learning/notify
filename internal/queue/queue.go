@@ -155,10 +155,18 @@ func (m *Manager) processTask(ctx context.Context, tq *targetQueue, task *Task) 
 		slog.Warn("Send failed", "taskId", task.ID, "attempt", task.Attempts, "error", err)
 
 		if task.Attempts < m.cfg.MaxRetries {
+			// Exponential backoff: delay = RetryDelay * 2^(attempts-1)
+			// attempts is 1-based here (already incremented)
+			// attempt 1 (next retry 2): delay * 1
+			// attempt 2 (next retry 3): delay * 2
+			// attempt 3 (next retry 4): delay * 4
+			backoffFactor := 1 << (task.Attempts - 1)
+			delay := m.cfg.RetryDelay * time.Duration(backoffFactor)
+
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(m.cfg.RetryDelay):
+			case <-time.After(delay):
 			}
 		}
 	}
