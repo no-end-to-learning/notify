@@ -25,8 +25,7 @@ type LarkConfig struct {
 }
 
 type TelegramConfig struct {
-	BotToken   string
-	MirrorChat string
+	BotToken string
 }
 
 type QueueConfig struct {
@@ -47,8 +46,7 @@ func Load() *Config {
 			AppSecret: getEnv("APP_LARK_SECRET", ""),
 		},
 		Telegram: TelegramConfig{
-			BotToken:   getEnv("APP_TELEGRAM_BOT_TOKEN", ""),
-			MirrorChat: getEnv("APP_TELEGRAM_MIRROR_CHAT", ""),
+			BotToken: getEnv("APP_TELEGRAM_BOT_TOKEN", ""),
 		},
 		Queue: QueueConfig{
 			RatePerSecond: getEnvFloat("QUEUE_RATE_LIMIT", 1.0),

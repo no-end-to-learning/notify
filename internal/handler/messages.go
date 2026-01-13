@@ -59,11 +59,6 @@ func SendMessage(w http.ResponseWriter, r *http.Request) {
 	message := svc.BuildMessage(req.Params)
 	taskID := queue.GetManager().Enqueue(channel, req.Target, message)
 
-	// Mirror Lark messages to Telegram
-	if channel == service.ChannelLark {
-		mirrorToTelegram(req.Params)
-	}
-
 	writeJSON(w, http.StatusOK, &service.SendResult{
 		TaskID:  taskID,
 		Success: true,

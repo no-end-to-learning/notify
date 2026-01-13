@@ -49,11 +49,6 @@ func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 	message := formatGrafanaAlert(channel, alert)
 	taskID := queue.GetManager().Enqueue(channel, target, message)
 
-	// Mirror Lark Grafana alerts to Telegram
-	if channel == service.ChannelLark {
-		mirrorGrafanaAlertToTelegram(alert)
-	}
-
 	writeJSON(w, http.StatusOK, &service.SendResult{
 		TaskID:  taskID,
 		Success: true,

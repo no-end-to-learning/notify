@@ -30,9 +30,6 @@ func main() {
 	// Initialize queue
 	queue.Init(cfg.Queue)
 
-	// Initialize mirror
-	handler.InitMirror(cfg.Telegram.MirrorChat)
-
 	// Setup routes
 	mux := http.NewServeMux()
 

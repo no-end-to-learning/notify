@@ -139,7 +139,6 @@ GET /api/chats?channel=lark
 | APP_LARK_ID | 飞书应用 App ID | - |
 | APP_LARK_SECRET | 飞书应用 App Secret | - |
 | APP_TELEGRAM_BOT_TOKEN | Telegram Bot Token | - |
-| APP_TELEGRAM_MIRROR_CHAT | Telegram 镜像群组 ID | - |
 | QUEUE_RATE_LIMIT | 发送速率限制 (个/秒) | 1.0 |
 | QUEUE_MAX_RETRIES | 最大重试次数 | 3 |
 | QUEUE_RETRY_DELAY | 重试延迟时间 | 1s |
