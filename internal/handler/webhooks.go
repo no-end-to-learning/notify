@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"notify/internal/queue"
 	"notify/internal/service"
@@ -103,13 +102,6 @@ func formatGrafanaAlertForLark(alert service.GrafanaAlert) map[string]any {
 		})
 	}
 
-	if len(elements) == 0 {
-		elements = append(elements, map[string]any{
-			"tag":      "note",
-			"elements": []any{map[string]any{"tag": "plain_text", "content": time.Now().String()}},
-		})
-	}
-
 	return map[string]any{
 		"config": map[string]any{"wide_screen_mode": true},
 		"header": map[string]any{
@@ -147,10 +139,6 @@ func formatGrafanaAlertForTelegram(alert service.GrafanaAlert) map[string]any {
 	// Note: Message (Italic)
 	if alert.Message != "" {
 		parts = append(parts, "<i>"+service.EscapeHTML(alert.Message)+"</i>")
-	}
-
-	if len(parts) == 1 {
-		parts = append(parts, service.EscapeHTML(time.Now().String()))
 	}
 
 	return map[string]any{
