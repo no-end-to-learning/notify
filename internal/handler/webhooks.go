@@ -16,13 +16,8 @@ func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 	channelStr := r.URL.Query().Get("channel")
 	target := r.URL.Query().Get("target")
 
-	// Compatibility: use to if target is empty
-	if target == "" {
-		target = r.URL.Query().Get("to")
-	}
-
 	if channelStr == "" || target == "" {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and target (or to) query params are required")
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and target query params are required")
 		return
 	}
 
