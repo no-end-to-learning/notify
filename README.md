@@ -39,6 +39,13 @@ direnv allow
 source .env
 ```
 
+### 飞书应用权限
+
+为了正常使用飞书通道，请确保飞书应用已开通以下权限：
+
+- `im:message:send_as_bot`: 以应用身份发送消息
+- `im:chat:list`: 获取群组列表（仅用于 `/api/chats` 接口）
+
 ### 运行
 
 ```bash
@@ -83,14 +90,16 @@ Content-Type: application/json
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | channel | string | 是 | 通道类型：`lark` / `telegram` |
-| target | string | 是 | 接收目标。飞书为 `chat_id`；Telegram 为 `chat_id` 或 `chat_id:topic_id`（支持群组 Topic）。兼容旧参数 `to`。 |
+| target | string | 是 | 接收目标。飞书为 `chat_id`；Telegram 为 `chat_id` 或 `chat_id:thread_id`（支持 Topic）。兼容旧参数 `to`。 |
 | params.title | string | 否 | 消息标题 |
 | params.color | string | 否 | 标题颜色：Blue/Green/Orange/Grey/Red/Purple (Telegram 消息忽略此字段) |
-| params.content | string | 否 | Markdown 内容 |
+| params.content | string | 否 | 消息内容（飞书支持 Markdown；Telegram 支持 HTML） |
 | params.note | string | 否 | 备注 |
 | params.url | string | 否 | 跳转链接 |
 
 ### 发送原始消息
+
+直接透传对应平台的原始消息结构，用于发送更复杂的卡片或特殊消息。
 
 ```
 POST /api/messages/raw
@@ -109,10 +118,21 @@ Content-Type: application/json
 
 ### Grafana 告警
 
+支持直接将 Grafana Webhook 指向此接口。
+
 ```
 POST /api/webhooks/grafana?channel=lark&target=oc_xxx
 Content-Type: application/json
+```
 
+**Query 参数**
+
+- `channel`: `lark` 或 `telegram`
+- `target`: 接收目标 ID (兼容 `to` 参数)
+
+**Payload 示例**
+
+```json
 {
   "state": "alerting",
   "ruleName": "CPU 使用率过高",
