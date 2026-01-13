@@ -40,22 +40,11 @@ type ChatItem struct {
 type GrafanaAlert struct {
 	State       string      `json:"state"`
 	RuleName    string      `json:"ruleName"`
-	RuleURL     string      `json:"ruleUrl,omitempty"`
 	Message     string      `json:"message,omitempty"`
-	ImageURL    string      `json:"imageUrl,omitempty"`
 	EvalMatches []EvalMatch `json:"evalMatches,omitempty"`
 }
 
 type EvalMatch struct {
 	Metric string  `json:"metric"`
 	Value  float64 `json:"value"`
-}
-
-var ColorEmoji = map[Color]string{
-	ColorBlue:   "🔵",
-	ColorGreen:  "🟢",
-	ColorOrange: "🟠",
-	ColorGrey:   "⚪",
-	ColorRed:    "🔴",
-	ColorPurple: "🟣",
 }
