@@ -125,14 +125,16 @@ func ListChats(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	bytes, _ := json.Marshal(data)
+	w.Write(bytes)
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(ErrorResponse{
+	bytes, _ := json.Marshal(ErrorResponse{
 		Error:   code,
 		Message: message,
 	})
+	w.Write(bytes)
 }
