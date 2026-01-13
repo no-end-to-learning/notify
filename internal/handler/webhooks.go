@@ -42,10 +42,9 @@ func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	message := formatGrafanaAlert(channel, alert)
-	taskID := queue.GetManager().Enqueue(channel, target, message)
+	queue.GetManager().Enqueue(channel, target, message)
 
 	writeJSON(w, http.StatusOK, &service.SendResult{
-		TaskID:  taskID,
 		Success: true,
 	})
 }

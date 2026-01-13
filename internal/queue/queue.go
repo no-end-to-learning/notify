@@ -57,7 +57,7 @@ func GetManager() *Manager {
 	return manager
 }
 
-func (m *Manager) Enqueue(channel service.Channel, target string, message any) string {
+func (m *Manager) Enqueue(channel service.Channel, target string, message any) {
 	m.taskSeqMu.Lock()
 	m.taskSeq++
 	taskID := fmt.Sprintf("task_%d_%d", time.Now().UnixNano(), m.taskSeq)
@@ -81,7 +81,7 @@ func (m *Manager) Enqueue(channel service.Channel, target string, message any) s
 		if err != nil {
 			m.mu.Unlock()
 			slog.Error("Failed to get service for queue", "channel", channel, "error", err)
-			return taskID
+			return
 		}
 
 		tq = &targetQueue{
@@ -104,8 +104,6 @@ func (m *Manager) Enqueue(channel service.Channel, target string, message any) s
 		slog.Warn("Queue full, task dropped", "taskId", taskID, "channel", channel, "target", target)
 	}
 	m.mu.Unlock()
-
-	return taskID
 }
 
 func (m *Manager) runWorker(tq *targetQueue) {
@@ -148,7 +146,7 @@ func (m *Manager) processTask(ctx context.Context, tq *targetQueue, task *Task) 
 		task.Attempts++
 		_, err := tq.svc.SendRawMessage(task.Target, task.Message)
 		if err == nil {
-			slog.Info("Message sent", "taskId", task.ID, "attempt", task.Attempts)
+			slog.Info("Message sent", "attempt", task.Attempts)
 			return
 		}
 		task.LastError = err.Error()

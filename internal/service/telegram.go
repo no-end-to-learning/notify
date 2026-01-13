@@ -75,7 +75,7 @@ func (s *TelegramService) SendRawMessage(target string, message any) (*SendResul
 		}
 	}
 
-	slog.Info("Sending Telegram message", "target", target, "chatID", chatID, "threadID", threadID, slog.Any("payload", payload))
+	slog.Info("Sending Telegram message", "target", target, slog.Any("payload", payload))
 
 	body, _ := json.Marshal(payload)
 	resp, err := s.client.Post(url, "application/json", bytes.NewReader(body))

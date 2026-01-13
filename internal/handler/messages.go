@@ -50,10 +50,9 @@ func SendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	message := svc.BuildMessage(req.Params)
-	taskID := queue.GetManager().Enqueue(channel, req.Target, message)
+	queue.GetManager().Enqueue(channel, req.Target, message)
 
 	writeJSON(w, http.StatusOK, &service.SendResult{
-		TaskID:  taskID,
 		Success: true,
 	})
 }
@@ -82,10 +81,9 @@ func SendRawMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	taskID := queue.GetManager().Enqueue(channel, req.Target, req.Message)
+	queue.GetManager().Enqueue(channel, req.Target, req.Message)
 
 	writeJSON(w, http.StatusOK, &service.SendResult{
-		TaskID:  taskID,
 		Success: true,
 	})
 }

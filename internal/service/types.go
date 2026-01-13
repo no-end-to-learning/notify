@@ -27,8 +27,7 @@ type MessageParams struct {
 }
 
 type SendResult struct {
-	TaskID  string `json:"taskId,omitempty"`
-	Success bool   `json:"success"`
+	Success bool `json:"success"`
 }
 
 type ChatItem struct {
