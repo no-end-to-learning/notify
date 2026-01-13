@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,20 +71,21 @@ func formatGrafanaAlertForLark(alert service.GrafanaAlert) map[string]any {
 
 	switch alert.State {
 	case "alerting":
-		template = "Orange"
+		template = string(service.ColorOrange)
 		title = alert.RuleName
 	case "ok":
-		template = "Green"
+		template = string(service.ColorGreen)
 		title = "✅ " + alert.RuleName
 	default:
-		template = "Grey"
+		template = string(service.ColorGrey)
 		title = alert.RuleName
 	}
 
 	if len(alert.EvalMatches) > 0 {
 		var items []string
 		for _, item := range alert.EvalMatches {
-			items = append(items, fmt.Sprintf("%s: %v", item.Metric, item.Value))
+			val := strconv.FormatFloat(item.Value, 'f', -1, 64)
+			items = append(items, fmt.Sprintf("%s: %s", item.Metric, val))
 		}
 		elements = append(elements, map[string]any{
 			"tag":     "markdown",
@@ -136,7 +138,8 @@ func formatGrafanaAlertForTelegram(alert service.GrafanaAlert) map[string]any {
 	if len(alert.EvalMatches) > 0 {
 		var items []string
 		for _, item := range alert.EvalMatches {
-			items = append(items, fmt.Sprintf("%s: %v", service.EscapeHTML(item.Metric), item.Value))
+			val := strconv.FormatFloat(item.Value, 'f', -1, 64)
+			items = append(items, fmt.Sprintf("%s: %s", service.EscapeHTML(item.Metric), val))
 		}
 		parts = append(parts, strings.Join(items, "\n"))
 	}

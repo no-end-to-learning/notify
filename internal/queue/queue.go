@@ -122,7 +122,7 @@ func (m *Manager) runWorker(tq *targetQueue) {
 
 		case task := <-tq.tasks:
 			idleTimer.Reset(5 * time.Minute)
-			m.processTask(tq, task)
+			m.processTask(m.ctx, tq, task)
 
 		case <-idleTimer.C:
 			m.mu.Lock()
@@ -139,8 +139,8 @@ func (m *Manager) runWorker(tq *targetQueue) {
 	}
 }
 
-func (m *Manager) processTask(tq *targetQueue, task *Task) {
-	if err := tq.limiter.Wait(m.ctx); err != nil {
+func (m *Manager) processTask(ctx context.Context, tq *targetQueue, task *Task) {
+	if err := tq.limiter.Wait(ctx); err != nil {
 		return
 	}
 
@@ -155,17 +155,23 @@ func (m *Manager) processTask(tq *targetQueue, task *Task) {
 		slog.Warn("Send failed", "taskId", task.ID, "attempt", task.Attempts, "error", err)
 
 		if task.Attempts < m.cfg.MaxRetries {
-			time.Sleep(m.cfg.RetryDelay)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(m.cfg.RetryDelay):
+			}
 		}
 	}
 	slog.Error("Send failed after retries", "taskId", task.ID, "attempts", m.cfg.MaxRetries, "lastError", task.LastError)
 }
 
 func (m *Manager) drainQueue(tq *targetQueue) {
+	// Use background context to allow draining even if manager context is cancelled
+	ctx := context.Background()
 	for {
 		select {
 		case task := <-tq.tasks:
-			m.processTask(tq, task)
+			m.processTask(ctx, tq, task)
 		default:
 			return
 		}

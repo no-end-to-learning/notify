@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
+	"time"
 
 	"notify/internal/config"
 )
@@ -14,6 +16,9 @@ type LarkService struct {
 	appID     string
 	appSecret string
 	client    *http.Client
+	token     string
+	tokenExp  time.Time
+	tokenMu   sync.Mutex
 }
 
 func NewLarkService(cfg config.LarkConfig) *LarkService {
@@ -130,6 +135,13 @@ func (s *LarkService) ListChats() ([]ChatItem, error) {
 }
 
 func (s *LarkService) getTenantAccessToken() (string, error) {
+	s.tokenMu.Lock()
+	defer s.tokenMu.Unlock()
+
+	if s.token != "" && time.Now().Before(s.tokenExp) {
+		return s.token, nil
+	}
+
 	reqBody := map[string]string{
 		"app_id":     s.appID,
 		"app_secret": s.appSecret,
@@ -150,6 +162,7 @@ func (s *LarkService) getTenantAccessToken() (string, error) {
 		Code              int    `json:"code"`
 		Msg               string `json:"msg"`
 		TenantAccessToken string `json:"tenant_access_token"`
+		Expire            int    `json:"expire"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
@@ -158,6 +171,10 @@ func (s *LarkService) getTenantAccessToken() (string, error) {
 	if result.Code != 0 {
 		return "", fmt.Errorf("get token failed: %d - %s", result.Code, result.Msg)
 	}
+
+	s.token = result.TenantAccessToken
+	// Expire is in seconds, reduce by 60s buffer
+	s.tokenExp = time.Now().Add(time.Duration(result.Expire-60) * time.Second)
 
 	return result.TenantAccessToken, nil
 }
