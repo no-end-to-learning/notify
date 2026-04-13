@@ -46,18 +46,14 @@ source .env
 ./notify
 ```
 
-```bash
-./notify
-```
-
 ### Docker
 
 镜像由 CI 自动构建并推送到 Docker Hub：
 
 ```bash
 docker run -p 8000:8000 \
-  -e APP_LARK_ID=your_app_id \
-  -e APP_LARK_SECRET=your_app_secret \
+  -e APP_FEISHU_ID=your_app_id \
+  -e APP_FEISHU_SECRET=your_app_secret \
   -e APP_TELEGRAM_BOT_TOKEN=your_bot_token \
   your_username/notify:latest
 ```
@@ -71,7 +67,7 @@ POST /api/messages
 Content-Type: application/json
 
 {
-  "channel": "lark",
+  "channel": "feishu",
   "target": "oc_xxx",
   "params": {
     "title": "消息标题",
@@ -87,7 +83,7 @@ Content-Type: application/json
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| channel | string | 是 | 通道类型：`lark` / `telegram` |
+| channel | string | 是 | 通道类型：`feishu` / `telegram` |
 | target | string | 是 | 接收目标。飞书为 `chat_id`；Telegram 为 `chat_id` 或 `chat_id:thread_id`（支持 Topic）。 |
 | params.title | string | 否 | 消息标题 |
 | params.color | string | 否 | 标题颜色：Blue/Green/Orange/Grey/Red/Purple (Telegram 消息忽略此字段) |
@@ -104,7 +100,7 @@ POST /api/messages/raw
 Content-Type: application/json
 
 {
-  "channel": "lark",
+  "channel": "feishu",
   "target": "oc_xxx",
   "message": {
     "config": { "wide_screen_mode": true },
@@ -119,13 +115,13 @@ Content-Type: application/json
 支持直接将 Grafana Webhook 指向此接口。
 
 ```
-POST /api/webhooks/grafana?channel=lark&target=oc_xxx
+POST /api/webhooks/grafana?channel=feishu&target=oc_xxx
 Content-Type: application/json
 ```
 
 **Query 参数**
 
-- `channel`: `lark` 或 `telegram`
+- `channel`: `feishu` 或 `telegram`
 - `target`: 接收目标 ID
 
 **Payload 示例**
@@ -144,7 +140,7 @@ Content-Type: application/json
 ### 获取聊天列表（仅飞书）
 
 ```
-GET /api/chats?channel=lark
+GET /api/chats?channel=feishu
 ```
 
 ## 环境变量
@@ -154,12 +150,15 @@ GET /api/chats?channel=lark
 | APP_SERVER_HOST | 服务监听地址 | 0.0.0.0 |
 | APP_SERVER_PORT | 服务监听端口 | 8000 |
 | APP_SERVER_BASE_URL | 服务基础 URL | http://localhost:8000/ |
-| APP_LARK_ID | 飞书应用 App ID | - |
-| APP_LARK_SECRET | 飞书应用 App Secret | - |
+| APP_FEISHU_ID | 飞书应用 App ID | - |
+| APP_FEISHU_SECRET | 飞书应用 App Secret | - |
 | APP_TELEGRAM_BOT_TOKEN | Telegram Bot Token | - |
+| APP_LOG_LEVEL | 日志级别：debug/info/warn/error | info |
 | QUEUE_RATE_LIMIT | 发送速率限制 (个/秒) | 1.0 |
 | QUEUE_MAX_RETRIES | 最大重试次数 | 3 |
-| QUEUE_RETRY_DELAY | 重试延迟时间 | 1s |
+| QUEUE_RETRY_DELAY | 重试基础延迟（指数退避） | 1s |
+| QUEUE_BUFFER_SIZE | 每个目标的队列缓冲大小 | 1000 |
+| QUEUE_IDLE_TIMEOUT | 队列空闲多久后自动释放 | 5m |
 
 ## 限频与重试
 
@@ -170,7 +169,7 @@ GET /api/chats?channel=lark
   - 例如：同时向飞书群 A 和群 B 发送消息，它们互不影响，各自都能达到 1条/秒的速率。但如果短时间内向群 A 发送大量消息，这些消息会排队并按 1条/秒的速度依次发出。
 - **自动重试**：如果发送失败（例如网络波动或 API 临时错误），系统会自动重试。
   - 默认重试 **3次**（`QUEUE_MAX_RETRIES`）。
-  - 每次重试间隔 **1秒**（`QUEUE_RETRY_DELAY`）。
+  - 采用**指数退避**策略，第 1 次重试延迟 1s，第 2 次 2s，第 3 次 4s（`QUEUE_RETRY_DELAY` 配置基础延迟）。
   - 超过重试次数仍失败的任务将被丢弃，并记录错误日志。
 
 ## 常见问题 (FAQ)

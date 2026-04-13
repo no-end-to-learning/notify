@@ -12,53 +12,66 @@ import (
 	"notify/internal/config"
 )
 
-type LarkService struct {
+const feishuBaseURL = "https://open.feishu.cn"
+
+type FeishuService struct {
 	appID     string
 	appSecret string
 	client    *http.Client
 	token     string
 	tokenExp  time.Time
-	tokenMu   sync.Mutex
+	tokenMu   sync.RWMutex
 }
 
-func NewLarkService(cfg config.LarkConfig) *LarkService {
-	return &LarkService{
+func NewFeishuService(cfg config.FeishuConfig) *FeishuService {
+	return &FeishuService{
 		appID:     cfg.AppID,
 		appSecret: cfg.AppSecret,
-		client:    &http.Client{},
+		client:    &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
-func (s *LarkService) Channel() Channel {
-	return ChannelLark
+func (s *FeishuService) Channel() Channel {
+	return ChannelFeishu
 }
 
-func (s *LarkService) BuildMessage(params MessageParams) any {
+func (s *FeishuService) BuildMessage(params MessageParams) any {
 	return s.buildCardMessage(params)
 }
 
-func (s *LarkService) SendMessage(target string, params MessageParams) (*SendResult, error) {
+func (s *FeishuService) SendMessage(target string, params MessageParams) (*SendResult, error) {
 	message := s.buildCardMessage(params)
 	return s.SendRawMessage(target, message)
 }
 
-func (s *LarkService) SendRawMessage(target string, message any) (*SendResult, error) {
-	slog.Info("Sending Lark message", "target", target, slog.Any("payload", message))
+func (s *FeishuService) SendRawMessage(target string, message any) (*SendResult, error) {
+	slog.Info("Sending Feishu message", "target", target)
 
 	token, err := s.getTenantAccessToken()
 	if err != nil {
 		return nil, fmt.Errorf("get tenant access token: %w", err)
 	}
 
-	content, _ := json.Marshal(message)
+	content, err := json.Marshal(message)
+	if err != nil {
+		return nil, fmt.Errorf("marshal message: %w", err)
+	}
+
 	reqBody := map[string]any{
 		"receive_id": target,
 		"msg_type":   "interactive",
 		"content":    string(content),
 	}
 
-	body, _ := json.Marshal(reqBody)
-	req, _ := http.NewRequest("POST", "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id", bytes.NewReader(body))
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", feishuBaseURL+"/open-apis/im/v1/messages?receive_id_type=chat_id", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 
@@ -68,34 +81,35 @@ func (s *LarkService) SendRawMessage(target string, message any) (*SendResult, e
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+
 	var result struct {
 		Code int    `json:"code"`
 		Msg  string `json:"msg"`
-		Data struct {
-			MessageID string `json:"message_id"`
-		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
 	if result.Code != 0 {
-		return nil, fmt.Errorf("lark error: %d - %s", result.Code, result.Msg)
+		return nil, fmt.Errorf("feishu error: %d - %s", result.Code, result.Msg)
 	}
 
-	return &SendResult{
-		Success: true,
-	}, nil
+	return &SendResult{Success: true}, nil
 }
 
-
-func (s *LarkService) ListChats() ([]ChatItem, error) {
+func (s *FeishuService) ListChats() ([]ChatItem, error) {
 	token, err := s.getTenantAccessToken()
 	if err != nil {
 		return nil, fmt.Errorf("get tenant access token: %w", err)
 	}
 
-	req, _ := http.NewRequest("GET", "https://open.feishu.cn/open-apis/im/v1/chats?page_size=100", nil)
+	req, err := http.NewRequest("GET", feishuBaseURL+"/open-apis/im/v1/chats?page_size=100", nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := s.client.Do(req)
@@ -103,6 +117,10 @@ func (s *LarkService) ListChats() ([]ChatItem, error) {
 		return nil, fmt.Errorf("list chats: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
 
 	var result struct {
 		Code int    `json:"code"`
@@ -120,7 +138,7 @@ func (s *LarkService) ListChats() ([]ChatItem, error) {
 	}
 
 	if result.Code != 0 {
-		return nil, fmt.Errorf("lark error: %d - %s", result.Code, result.Msg)
+		return nil, fmt.Errorf("feishu error: %d - %s", result.Code, result.Msg)
 	}
 
 	chats := make([]ChatItem, len(result.Data.Items))
@@ -134,10 +152,19 @@ func (s *LarkService) ListChats() ([]ChatItem, error) {
 	return chats, nil
 }
 
-func (s *LarkService) getTenantAccessToken() (string, error) {
+func (s *FeishuService) getTenantAccessToken() (string, error) {
+	s.tokenMu.RLock()
+	if s.token != "" && time.Now().Before(s.tokenExp) {
+		token := s.token
+		s.tokenMu.RUnlock()
+		return token, nil
+	}
+	s.tokenMu.RUnlock()
+
 	s.tokenMu.Lock()
 	defer s.tokenMu.Unlock()
 
+	// double-check after acquiring write lock
 	if s.token != "" && time.Now().Before(s.tokenExp) {
 		return s.token, nil
 	}
@@ -146,10 +173,13 @@ func (s *LarkService) getTenantAccessToken() (string, error) {
 		"app_id":     s.appID,
 		"app_secret": s.appSecret,
 	}
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("marshal request: %w", err)
+	}
 
 	resp, err := s.client.Post(
-		"https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+		feishuBaseURL+"/open-apis/auth/v3/tenant_access_token/internal",
 		"application/json",
 		bytes.NewReader(body),
 	)
@@ -157,6 +187,10 @@ func (s *LarkService) getTenantAccessToken() (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
 
 	var result struct {
 		Code              int    `json:"code"`
@@ -179,7 +213,7 @@ func (s *LarkService) getTenantAccessToken() (string, error) {
 	return result.TenantAccessToken, nil
 }
 
-func (s *LarkService) buildCardMessage(params MessageParams) map[string]any {
+func (s *FeishuService) buildCardMessage(params MessageParams) map[string]any {
 	message := map[string]any{
 		"config":   map[string]any{"wide_screen_mode": true},
 		"elements": []any{},

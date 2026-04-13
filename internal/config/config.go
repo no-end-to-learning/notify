@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -8,7 +9,7 @@ import (
 
 type Config struct {
 	Server   ServerConfig
-	Lark     LarkConfig
+	Feishu   FeishuConfig
 	Telegram TelegramConfig
 	Queue    QueueConfig
 }
@@ -19,7 +20,7 @@ type ServerConfig struct {
 	BaseURL string
 }
 
-type LarkConfig struct {
+type FeishuConfig struct {
 	AppID     string
 	AppSecret string
 }
@@ -30,30 +31,51 @@ type TelegramConfig struct {
 
 type QueueConfig struct {
 	RatePerSecond float64
-	MaxRetries    int
+	MaxAttempts   int
 	RetryDelay    time.Duration
+	BufferSize    int
+	IdleTimeout   time.Duration
 }
 
-func Load() *Config {
-	return &Config{
+func Load() (*Config, error) {
+	cfg := &Config{
 		Server: ServerConfig{
 			Host:    getEnv("APP_SERVER_HOST", "0.0.0.0"),
 			Port:    getEnvInt("APP_SERVER_PORT", 8000),
 			BaseURL: getEnv("APP_SERVER_BASE_URL", "http://localhost:8000/"),
 		},
-		Lark: LarkConfig{
-			AppID:     getEnv("APP_LARK_ID", ""),
-			AppSecret: getEnv("APP_LARK_SECRET", ""),
+		Feishu: FeishuConfig{
+			AppID:     getEnv("APP_FEISHU_ID", ""),
+			AppSecret: getEnv("APP_FEISHU_SECRET", ""),
 		},
 		Telegram: TelegramConfig{
 			BotToken: getEnv("APP_TELEGRAM_BOT_TOKEN", ""),
 		},
 		Queue: QueueConfig{
 			RatePerSecond: getEnvFloat("QUEUE_RATE_LIMIT", 1.0),
-			MaxRetries:    getEnvInt("QUEUE_MAX_RETRIES", 3),
+			MaxAttempts:   getEnvInt("QUEUE_MAX_ATTEMPTS", 3),
 			RetryDelay:    getEnvDuration("QUEUE_RETRY_DELAY", time.Second),
+			BufferSize:    getEnvInt("QUEUE_BUFFER_SIZE", 1000),
+			IdleTimeout:   getEnvDuration("QUEUE_IDLE_TIMEOUT", 5*time.Minute),
 		},
 	}
+	if err := cfg.validate(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func (c *Config) validate() error {
+	feishuPartial := (c.Feishu.AppID == "") != (c.Feishu.AppSecret == "")
+	if feishuPartial {
+		return fmt.Errorf("feishu: APP_FEISHU_ID and APP_FEISHU_SECRET must both be set")
+	}
+
+	if c.Feishu.AppID == "" && c.Telegram.BotToken == "" {
+		return fmt.Errorf("at least one service must be configured (feishu or telegram)")
+	}
+
+	return nil
 }
 
 func getEnv(key, defaultValue string) string {

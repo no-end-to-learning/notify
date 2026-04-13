@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -31,14 +32,13 @@ type targetQueue struct {
 }
 
 type Manager struct {
-	queues     map[string]*targetQueue
-	mu         sync.Mutex
-	wg         sync.WaitGroup
-	ctx        context.Context
-	cancel     context.CancelFunc
-	cfg        config.QueueConfig
-	taskSeq    uint64
-	taskSeqMu  sync.Mutex
+	queues  map[string]*targetQueue
+	mu      sync.Mutex
+	wg      sync.WaitGroup
+	ctx     context.Context
+	cancel  context.CancelFunc
+	cfg     config.QueueConfig
+	taskSeq atomic.Uint64
 }
 
 var manager *Manager
@@ -58,10 +58,8 @@ func GetManager() *Manager {
 }
 
 func (m *Manager) Enqueue(channel service.Channel, target string, message any) {
-	m.taskSeqMu.Lock()
-	m.taskSeq++
-	taskID := fmt.Sprintf("task_%d_%d", time.Now().UnixNano(), m.taskSeq)
-	m.taskSeqMu.Unlock()
+	seq := m.taskSeq.Add(1)
+	taskID := fmt.Sprintf("task_%d_%d", time.Now().UnixNano(), seq)
 
 	task := &Task{
 		ID:        taskID,
@@ -86,7 +84,7 @@ func (m *Manager) Enqueue(channel service.Channel, target string, message any) {
 
 		tq = &targetQueue{
 			key:     key,
-			tasks:   make(chan *Task, 1000),
+			tasks:   make(chan *Task, m.cfg.BufferSize),
 			limiter: rate.NewLimiter(rate.Limit(m.cfg.RatePerSecond), 1),
 			svc:     svc,
 		}
@@ -109,7 +107,7 @@ func (m *Manager) Enqueue(channel service.Channel, target string, message any) {
 func (m *Manager) runWorker(tq *targetQueue) {
 	defer m.wg.Done()
 
-	idleTimer := time.NewTimer(5 * time.Minute)
+	idleTimer := time.NewTimer(m.cfg.IdleTimeout)
 	defer idleTimer.Stop()
 
 	for {
@@ -119,7 +117,7 @@ func (m *Manager) runWorker(tq *targetQueue) {
 			return
 
 		case task := <-tq.tasks:
-			idleTimer.Reset(5 * time.Minute)
+			idleTimer.Reset(m.cfg.IdleTimeout)
 			m.processTask(m.ctx, tq, task)
 
 		case <-idleTimer.C:
@@ -132,7 +130,7 @@ func (m *Manager) runWorker(tq *targetQueue) {
 				return
 			}
 			m.mu.Unlock()
-			idleTimer.Reset(5 * time.Minute)
+			idleTimer.Reset(m.cfg.IdleTimeout)
 		}
 	}
 }
@@ -142,7 +140,7 @@ func (m *Manager) processTask(ctx context.Context, tq *targetQueue, task *Task) 
 		return
 	}
 
-	for task.Attempts < m.cfg.MaxRetries {
+	for task.Attempts < m.cfg.MaxAttempts {
 		task.Attempts++
 		_, err := tq.svc.SendRawMessage(task.Target, task.Message)
 		if err == nil {
@@ -152,12 +150,8 @@ func (m *Manager) processTask(ctx context.Context, tq *targetQueue, task *Task) 
 		task.LastError = err.Error()
 		slog.Warn("Send failed", "taskId", task.ID, "attempt", task.Attempts, "error", err)
 
-		if task.Attempts < m.cfg.MaxRetries {
+		if task.Attempts < m.cfg.MaxAttempts {
 			// Exponential backoff: delay = RetryDelay * 2^(attempts-1)
-			// attempts is 1-based here (already incremented)
-			// attempt 1 (next retry 2): delay * 1
-			// attempt 2 (next retry 3): delay * 2
-			// attempt 3 (next retry 4): delay * 4
 			backoffFactor := 1 << (task.Attempts - 1)
 			delay := m.cfg.RetryDelay * time.Duration(backoffFactor)
 
@@ -168,16 +162,27 @@ func (m *Manager) processTask(ctx context.Context, tq *targetQueue, task *Task) 
 			}
 		}
 	}
-	slog.Error("Send failed after retries", "taskId", task.ID, "attempts", m.cfg.MaxRetries, "lastError", task.LastError)
+	slog.Error("Send failed after retries", "taskId", task.ID, "attempts", m.cfg.MaxAttempts, "lastError", task.LastError)
 }
 
 func (m *Manager) drainQueue(tq *targetQueue) {
-	// Use background context to allow draining even if manager context is cancelled
-	ctx := context.Background()
+	// Skip rate limiter during shutdown drain — send remaining tasks as fast as possible.
 	for {
 		select {
 		case task := <-tq.tasks:
-			m.processTask(ctx, tq, task)
+			for task.Attempts < m.cfg.MaxAttempts {
+				task.Attempts++
+				_, err := tq.svc.SendRawMessage(task.Target, task.Message)
+				if err == nil {
+					slog.Info("Message sent during drain", "attempt", task.Attempts)
+					break
+				}
+				task.LastError = err.Error()
+				slog.Warn("Send failed during drain", "taskId", task.ID, "attempt", task.Attempts, "error", err)
+			}
+			if task.LastError != "" && task.Attempts >= m.cfg.MaxAttempts {
+				slog.Error("Send failed after retries during drain", "taskId", task.ID, "attempts", task.Attempts, "lastError", task.LastError)
+			}
 		default:
 			return
 		}

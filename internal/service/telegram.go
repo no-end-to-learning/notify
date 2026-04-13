@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"notify/internal/config"
 )
@@ -22,7 +23,7 @@ func NewTelegramService(cfg config.TelegramConfig) *TelegramService {
 	return &TelegramService{
 		botToken: cfg.BotToken,
 		baseURL:  fmt.Sprintf("https://api.telegram.org/bot%s", cfg.BotToken),
-		client:   &http.Client{},
+		client:   &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -75,22 +76,27 @@ func (s *TelegramService) SendRawMessage(target string, message any) (*SendResul
 		}
 	}
 
-	slog.Info("Sending Telegram message", "target", target, slog.Any("payload", payload))
+	slog.Info("Sending Telegram message", "target", target)
 
-	body, _ := json.Marshal(payload)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal payload: %w", err)
+	}
+
 	resp, err := s.client.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("send message: %w", err)
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+
 	var result struct {
 		OK          bool   `json:"ok"`
 		ErrorCode   int    `json:"error_code"`
 		Description string `json:"description"`
-		Result      struct {
-			MessageID int `json:"message_id"`
-		} `json:"result"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
@@ -100,9 +106,7 @@ func (s *TelegramService) SendRawMessage(target string, message any) (*SendResul
 		return nil, fmt.Errorf("telegram error: %d - %s", result.ErrorCode, result.Description)
 	}
 
-	return &SendResult{
-		Success: true,
-	}, nil
+	return &SendResult{Success: true}, nil
 }
 
 func (s *TelegramService) buildMessage(params MessageParams) string {
@@ -118,11 +122,10 @@ func (s *TelegramService) buildMessage(params MessageParams) string {
 	}
 
 	if params.URL != "" {
-		parts = append(parts, fmt.Sprintf("<a href=\"%s\">View Details</a>", params.URL))
+		parts = append(parts, fmt.Sprintf("<a href=\"%s\">View Details</a>", EscapeHTML(params.URL)))
 	}
 
 	if params.Note != "" {
-		// Use italic for note
 		parts = append(parts, "<i>"+EscapeHTML(params.Note)+"</i>")
 	}
 
@@ -130,11 +133,10 @@ func (s *TelegramService) buildMessage(params MessageParams) string {
 }
 
 func EscapeHTML(text string) string {
-	// Escape HTML special characters
 	replacer := strings.NewReplacer(
+		"&", "&amp;",
 		"<", "&lt;",
 		">", "&gt;",
-		"&", "&amp;",
 	)
 	return replacer.Replace(text)
 }
