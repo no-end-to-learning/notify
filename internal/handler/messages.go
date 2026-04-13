@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 
 	"notify/internal/queue"
@@ -26,8 +28,15 @@ type ErrorResponse struct {
 }
 
 func SendMessage(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Failed to read request body")
+		return
+	}
+	slog.Info("Send message request received", slog.Any("body", rawJSON(body)))
+
 	var req SendMessageRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.Unmarshal(body, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid request body")
 		return
 	}
@@ -44,8 +53,15 @@ func SendMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 func SendRawMessage(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Failed to read request body")
+		return
+	}
+	slog.Info("Send raw message request received", slog.Any("body", rawJSON(body)))
+
 	var req SendRawMessageRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.Unmarshal(body, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid request body")
 		return
 	}

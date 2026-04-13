@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -27,13 +28,19 @@ func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var alert service.GrafanaAlert
-	if err := json.NewDecoder(r.Body).Decode(&alert); err != nil {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid request body")
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Failed to read request body")
 		return
 	}
 
-	slog.Info("Grafana alert received", slog.Any("alert", alert))
+	slog.Info("Grafana alert received", slog.Any("body", rawJSON(body)))
+
+	var alert service.GrafanaAlert
+	if err := json.Unmarshal(body, &alert); err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid request body")
+		return
+	}
 
 	_, err = service.GetService(channel)
 	if err != nil {
