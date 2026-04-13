@@ -18,12 +18,11 @@ type ChatLister interface {
 	ListChats() ([]ChatItem, error)
 }
 
-
 var services map[Channel]NotifyService
 
 func Init(cfg *config.Config) {
 	services = map[Channel]NotifyService{
-		ChannelLark:     NewLarkService(cfg.Lark),
+		ChannelFeishu:   NewFeishuService(cfg.Feishu),
 		ChannelTelegram: NewTelegramService(cfg.Telegram),
 	}
 }
@@ -38,7 +37,7 @@ func GetService(channel Channel) (NotifyService, error) {
 
 func ValidateChannel(s string) (Channel, error) {
 	switch Channel(strings.ToLower(s)) {
-	case ChannelLark, ChannelTelegram:
+	case ChannelFeishu, ChannelTelegram:
 		return Channel(strings.ToLower(s)), nil
 	default:
 		return "", fmt.Errorf("invalid channel: %s", s)

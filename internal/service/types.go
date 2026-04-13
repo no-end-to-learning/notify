@@ -3,7 +3,7 @@ package service
 type Channel string
 
 const (
-	ChannelLark     Channel = "lark"
+	ChannelFeishu   Channel = "feishu"
 	ChannelTelegram Channel = "telegram"
 )
 

@@ -54,12 +54,12 @@ func formatGrafanaAlert(channel service.Channel, alert service.GrafanaAlert) any
 	case service.ChannelTelegram:
 		return formatGrafanaAlertForTelegram(alert)
 	default:
-		return formatGrafanaAlertForLark(alert)
+		return formatGrafanaAlertForFeishu(alert)
 	}
 }
 
-func formatGrafanaAlertForLark(alert service.GrafanaAlert) map[string]any {
-	var elements []any
+func formatGrafanaAlertForFeishu(alert service.GrafanaAlert) map[string]any {
+	elements := []any{}
 	var template, title string
 
 	switch alert.State {

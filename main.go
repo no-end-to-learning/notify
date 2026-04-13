@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,14 +20,19 @@ import (
 
 func main() {
 	// Setup structured logging with color support
+	level := logLevelFromEnv()
 	logger := slog.New(tint.NewHandler(os.Stdout, &tint.Options{
-		Level:      slog.LevelInfo,
+		Level:      level,
 		TimeFormat: time.TimeOnly,
 	}))
 	slog.SetDefault(logger)
 
-	// Load configuration
-	cfg := config.Load()
+	// Load and validate configuration
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("Configuration error", "error", err)
+		os.Exit(1)
+	}
 
 	// Initialize services
 	service.Init(cfg)
@@ -49,7 +55,19 @@ func main() {
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit
 		slog.Info("Shutting down server...")
-		queue.GetManager().Shutdown()
+
+		done := make(chan struct{})
+		go func() {
+			queue.GetManager().Shutdown()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			slog.Info("Graceful shutdown complete")
+		case <-time.After(30 * time.Second):
+			slog.Warn("Shutdown timed out, forcing exit")
+		}
 		os.Exit(0)
 	}()
 
@@ -60,5 +78,18 @@ func main() {
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		slog.Error("Server failed", "error", err)
 		os.Exit(1)
+	}
+}
+
+func logLevelFromEnv() slog.Level {
+	switch strings.ToLower(os.Getenv("APP_LOG_LEVEL")) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
 	}
 }

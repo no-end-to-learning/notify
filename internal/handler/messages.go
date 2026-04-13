@@ -32,29 +32,15 @@ func SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Channel == "" || req.Target == "" {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and target are required")
-		return
-	}
-
-	channel, err := service.ValidateChannel(req.Channel)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
-		return
-	}
-
-	svc, err := service.GetService(channel)
-	if err != nil {
-		writeError(w, http.StatusNotFound, "NOT_FOUND", err.Error())
+	channel, svc, ok := resolveService(w, req.Channel, req.Target)
+	if !ok {
 		return
 	}
 
 	message := svc.BuildMessage(req.Params)
 	queue.GetManager().Enqueue(channel, req.Target, message)
 
-	writeJSON(w, http.StatusOK, &service.SendResult{
-		Success: true,
-	})
+	writeJSON(w, http.StatusOK, &service.SendResult{Success: true})
 }
 
 func SendRawMessage(w http.ResponseWriter, r *http.Request) {
@@ -64,28 +50,14 @@ func SendRawMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Channel == "" || req.Target == "" {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and target are required")
-		return
-	}
-
-	channel, err := service.ValidateChannel(req.Channel)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
-		return
-	}
-
-	_, err = service.GetService(channel)
-	if err != nil {
-		writeError(w, http.StatusNotFound, "NOT_FOUND", err.Error())
+	channel, _, ok := resolveService(w, req.Channel, req.Target)
+	if !ok {
 		return
 	}
 
 	queue.GetManager().Enqueue(channel, req.Target, req.Message)
 
-	writeJSON(w, http.StatusOK, &service.SendResult{
-		Success: true,
-	})
+	writeJSON(w, http.StatusOK, &service.SendResult{Success: true})
 }
 
 func ListChats(w http.ResponseWriter, r *http.Request) {
@@ -95,12 +67,12 @@ func ListChats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if channelStr != "lark" {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "only lark channel supports listing chats")
+	channel, err := service.ValidateChannel(channelStr)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 		return
 	}
 
-	channel, _ := service.ValidateChannel(channelStr)
 	svc, err := service.GetService(channel)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "NOT_FOUND", err.Error())
@@ -122,19 +94,40 @@ func ListChats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, chats)
 }
 
+// resolveService validates channel/target and returns the corresponding service.
+// Writes an error response and returns false if validation fails.
+func resolveService(w http.ResponseWriter, channelStr, target string) (service.Channel, service.NotifyService, bool) {
+	if channelStr == "" || target == "" {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "channel and target are required")
+		return "", nil, false
+	}
+
+	channel, err := service.ValidateChannel(channelStr)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		return "", nil, false
+	}
+
+	svc, err := service.GetService(channel)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", err.Error())
+		return "", nil, false
+	}
+
+	return channel, svc, true
+}
+
 func writeJSON(w http.ResponseWriter, status int, data any) {
+	b, err := json.Marshal(data)
+	if err != nil {
+		http.Error(w, `{"error":"INTERNAL_ERROR","message":"response serialization failed"}`, http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	bytes, _ := json.Marshal(data)
-	w.Write(bytes)
+	_, _ = w.Write(b)
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	bytes, _ := json.Marshal(ErrorResponse{
-		Error:   code,
-		Message: message,
-	})
-	w.Write(bytes)
+	writeJSON(w, status, ErrorResponse{Error: code, Message: message})
 }
