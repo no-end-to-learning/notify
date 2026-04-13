@@ -103,14 +103,17 @@ func formatGrafanaAlertForFeishu(alert service.GrafanaAlert) map[string]any {
 		})
 	}
 
-	return map[string]any{
+	card := map[string]any{
 		"config": map[string]any{"wide_screen_mode": true},
 		"header": map[string]any{
 			"title":    map[string]any{"tag": "plain_text", "content": title},
 			"template": template,
 		},
-		"elements": elements,
 	}
+	if len(elements) > 0 {
+		card["elements"] = elements
+	}
+	return card
 }
 
 func formatGrafanaAlertForTelegram(alert service.GrafanaAlert) map[string]any {
