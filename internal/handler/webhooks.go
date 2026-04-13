@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"notify/internal/queue"
 	"notify/internal/service"
@@ -103,17 +104,21 @@ func formatGrafanaAlertForFeishu(alert service.GrafanaAlert) map[string]any {
 		})
 	}
 
-	card := map[string]any{
+	if len(elements) == 0 {
+		elements = append(elements, map[string]any{
+			"tag":      "note",
+			"elements": []any{map[string]any{"tag": "plain_text", "content": time.Now().UTC().Format("2006-01-02 15:04:05 UTC")}},
+		})
+	}
+
+	return map[string]any{
 		"config": map[string]any{"wide_screen_mode": true},
 		"header": map[string]any{
 			"title":    map[string]any{"tag": "plain_text", "content": title},
 			"template": template,
 		},
+		"elements": elements,
 	}
-	if len(elements) > 0 {
-		card["elements"] = elements
-	}
-	return card
 }
 
 func formatGrafanaAlertForTelegram(alert service.GrafanaAlert) map[string]any {
