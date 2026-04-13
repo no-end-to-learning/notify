@@ -34,7 +34,7 @@ func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("Grafana alert received", slog.Any("body", rawJSON(body)))
+	slog.Info("Grafana alert received body=" + string(body))
 
 	var alert service.GrafanaAlert
 	if err := json.Unmarshal(body, &alert); err != nil {

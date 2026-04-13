@@ -33,7 +33,7 @@ func SendMessage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Failed to read request body")
 		return
 	}
-	slog.Info("Send message request received", slog.Any("body", rawJSON(body)))
+	slog.Info("Send message request received body=" + string(body))
 
 	var req SendMessageRequest
 	if err := json.Unmarshal(body, &req); err != nil {
@@ -58,7 +58,7 @@ func SendRawMessage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Failed to read request body")
 		return
 	}
-	slog.Info("Send raw message request received", slog.Any("body", rawJSON(body)))
+	slog.Info("Send raw message request received body=" + string(body))
 
 	var req SendRawMessageRequest
 	if err := json.Unmarshal(body, &req); err != nil {
