@@ -139,9 +139,26 @@ func normalizeUnifiedGrafanaAlert(webhook grafanaUnifiedWebhook) service.Grafana
 			if itemState != "" && itemState != "alerting" {
 				continue
 			}
+
+			if errorMessage := firstMeaningful(
+				item.Annotations["Error"],
+				item.Annotations["error"],
+			); errorMessage != "" {
+				source := firstMeaningful(item.Labels["rulename"], item.Labels["alertname"])
+				if source != "" && source != ruleName {
+					errorMessage = source + ": " + errorMessage
+				}
+				alert.Message = appendMessage(alert.Message, errorMessage)
+				continue
+			}
+
+			value, ok := unifiedAlertValue(item)
+			if !ok {
+				continue
+			}
 			alert.EvalMatches = append(alert.EvalMatches, service.EvalMatch{
 				Metric: unifiedAlertMetric(item),
-				Value:  unifiedAlertValue(item),
+				Value:  value,
 			})
 		}
 	}
@@ -170,7 +187,7 @@ func normalizeGrafanaState(state string) string {
 }
 
 func unifiedAlertMetric(alert grafanaUnifiedAlert) string {
-	if metric := firstNonEmpty(
+	if metric := firstMeaningful(
 		alert.Annotations["lark_metric"],
 		alert.Annotations["metric"],
 		alert.Labels["metric"],
@@ -191,18 +208,18 @@ func unifiedAlertMetric(alert grafanaUnifiedAlert) string {
 		return strings.Join(labels, ", ")
 	}
 
-	return firstNonEmpty(alert.Labels["alertname"], "alert")
+	return firstMeaningful(alert.Labels["alertname"], "alert")
 }
 
-func unifiedAlertValue(alert grafanaUnifiedAlert) float64 {
-	if value := firstNonEmpty(alert.Annotations["lark_value"], alert.Annotations["value"]); value != "" {
+func unifiedAlertValue(alert grafanaUnifiedAlert) (float64, bool) {
+	if value := firstMeaningful(alert.Annotations["lark_value"], alert.Annotations["value"]); value != "" {
 		if parsed, err := strconv.ParseFloat(value, 64); err == nil {
-			return parsed
+			return parsed, true
 		}
 	}
 
 	if value, ok := alert.Values["A"]; ok && value != nil {
-		return *value
+		return *value, true
 	}
 	keys := make([]string, 0, len(alert.Values))
 	for key := range alert.Values {
@@ -211,11 +228,33 @@ func unifiedAlertValue(alert grafanaUnifiedAlert) float64 {
 	sort.Strings(keys)
 	for _, key := range keys {
 		if alert.Values[key] != nil {
-			return *alert.Values[key]
+			return *alert.Values[key], true
 		}
 	}
 
-	return 0
+	return 0, false
+}
+
+func appendMessage(message, addition string) string {
+	if message == "" {
+		return addition
+	}
+	if addition == "" || strings.Contains(message, addition) {
+		return message
+	}
+	return message + "\n" + addition
+}
+
+func firstMeaningful(values ...string) string {
+	for _, value := range values {
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "", "[no value]", "<no value>", "no value":
+			continue
+		default:
+			return value
+		}
+	}
+	return ""
 }
 
 func isInternalGrafanaLabel(label string) bool {

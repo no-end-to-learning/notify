@@ -151,7 +151,7 @@ func TestDecodeGrafanaAlertDatasourceError(t *testing.T) {
 		"alerts":[{
 			"status":"firing",
 			"labels":{"alertname":"DatasourceError","datasource_uid":"al4sYqNVz","rulename":"Position mismatch"},
-			"annotations":{"Error":"database connection failed"},
+			"annotations":{"Error":"database connection failed","lark_metric":"[no value]","lark_value":"[no value]"},
 			"values":{}
 		}]
 	}`)
@@ -160,7 +160,32 @@ func TestDecodeGrafanaAlertDatasourceError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decodeGrafanaAlert() error = %v", err)
 	}
-	if len(got.EvalMatches) != 1 || got.EvalMatches[0].Metric != "Position mismatch" {
+	if got.RuleName != "DatasourceError" || got.Message != "Position mismatch: database connection failed" {
+		t.Fatalf("decoded alert = %#v", got)
+	}
+	if len(got.EvalMatches) != 0 {
+		t.Fatalf("decoded alert = %#v", got)
+	}
+}
+
+func TestDecodeGrafanaAlertSkipsMissingValue(t *testing.T) {
+	body := []byte(`{
+		"receiver":"Lark - Test",
+		"status":"firing",
+		"commonLabels":{"alertname":"Query warning"},
+		"alerts":[{
+			"status":"firing",
+			"labels":{"alertname":"Query warning","rulename":"Position mismatch"},
+			"annotations":{"lark_metric":"[no value]","lark_value":"[no value]"},
+			"values":{}
+		}]
+	}`)
+
+	got, _, err := decodeGrafanaAlert(body)
+	if err != nil {
+		t.Fatalf("decodeGrafanaAlert() error = %v", err)
+	}
+	if len(got.EvalMatches) != 0 {
 		t.Fatalf("decoded alert = %#v", got)
 	}
 }
