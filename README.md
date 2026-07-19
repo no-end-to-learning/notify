@@ -7,7 +7,7 @@
 - 统一 API 接口，通过 `channel` 参数切换通知渠道
 - 支持飞书卡片消息
 - 支持 Telegram Bot
-- Grafana 告警集成
+- Grafana 7 旧版告警与 Grafana 13 统一告警集成
 - 内置消息队列与自动限频重试
 
 ## 快速开始
@@ -123,6 +123,10 @@ Content-Type: application/json
 
 - `channel`: `feishu` 或 `telegram`
 - `target`: 接收目标 ID
+
+接口会自动识别 Grafana 7 旧版 Webhook 和 Grafana 13 统一告警 Webhook。统一告警可通过
+`lark_metric`、`lark_value` 和 `lark_message` annotations 保持与旧版相同的消息结构；未设置时会从
+告警标签和查询值生成默认内容。同一通知组中已恢复的告警项不会出现在当前异常列表中。
 
 **Payload 示例**
 

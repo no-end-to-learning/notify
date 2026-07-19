@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -35,13 +36,19 @@ func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("Grafana alert received body=" + string(body))
-
-	var alert service.GrafanaAlert
-	if err := json.Unmarshal(body, &alert); err != nil {
+	alert, payloadFormat, err := decodeGrafanaAlert(body)
+	if err != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid request body")
 		return
 	}
+
+	slog.Info("Grafana alert received",
+		"format", payloadFormat,
+		"state", alert.State,
+		"ruleName", alert.RuleName,
+		"matches", len(alert.EvalMatches),
+		"bodyBytes", len(body),
+	)
 
 	_, err = service.GetService(channel)
 	if err != nil {
@@ -55,6 +62,196 @@ func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, &service.SendResult{
 		Success: true,
 	})
+}
+
+type grafanaUnifiedWebhook struct {
+	Receiver          string                `json:"receiver"`
+	Status            string                `json:"status"`
+	State             string                `json:"state"`
+	Title             string                `json:"title"`
+	Message           string                `json:"message"`
+	Alerts            []grafanaUnifiedAlert `json:"alerts"`
+	GroupLabels       map[string]string     `json:"groupLabels"`
+	CommonLabels      map[string]string     `json:"commonLabels"`
+	CommonAnnotations map[string]string     `json:"commonAnnotations"`
+	TruncatedAlerts   int                   `json:"truncatedAlerts"`
+}
+
+type grafanaUnifiedAlert struct {
+	Status      string              `json:"status"`
+	Labels      map[string]string   `json:"labels"`
+	Annotations map[string]string   `json:"annotations"`
+	Values      map[string]*float64 `json:"values"`
+}
+
+func decodeGrafanaAlert(body []byte) (service.GrafanaAlert, string, error) {
+	var legacy service.GrafanaAlert
+	if err := json.Unmarshal(body, &legacy); err != nil {
+		return service.GrafanaAlert{}, "", err
+	}
+
+	var unified grafanaUnifiedWebhook
+	if err := json.Unmarshal(body, &unified); err != nil {
+		return service.GrafanaAlert{}, "", err
+	}
+
+	if isUnifiedGrafanaWebhook(unified) {
+		return normalizeUnifiedGrafanaAlert(unified), "unified", nil
+	}
+	if legacy.RuleName == "" && legacy.State == "" && legacy.EvalMatches == nil {
+		return service.GrafanaAlert{}, "", fmt.Errorf("unsupported Grafana webhook payload")
+	}
+
+	return legacy, "legacy", nil
+}
+
+func isUnifiedGrafanaWebhook(webhook grafanaUnifiedWebhook) bool {
+	return webhook.Receiver != "" || webhook.Status != "" || len(webhook.Alerts) > 0
+}
+
+func normalizeUnifiedGrafanaAlert(webhook grafanaUnifiedWebhook) service.GrafanaAlert {
+	state := normalizeGrafanaState(webhook.Status)
+	if state == "" {
+		state = normalizeGrafanaState(webhook.State)
+	}
+
+	ruleName := firstNonEmpty(
+		webhook.CommonLabels["alertname"],
+		webhook.GroupLabels["alertname"],
+		firstAlertLabel(webhook.Alerts, "alertname"),
+		webhook.Title,
+	)
+	message := firstNonEmpty(
+		webhook.CommonAnnotations["lark_message"],
+		webhook.CommonAnnotations["message"],
+		firstAlertAnnotation(webhook.Alerts, "lark_message"),
+		firstAlertAnnotation(webhook.Alerts, "message"),
+	)
+
+	alert := service.GrafanaAlert{
+		State:    state,
+		RuleName: ruleName,
+		Message:  message,
+	}
+	if state == "alerting" {
+		for _, item := range webhook.Alerts {
+			itemState := normalizeGrafanaState(item.Status)
+			if itemState != "" && itemState != "alerting" {
+				continue
+			}
+			alert.EvalMatches = append(alert.EvalMatches, service.EvalMatch{
+				Metric: unifiedAlertMetric(item),
+				Value:  unifiedAlertValue(item),
+			})
+		}
+	}
+
+	if webhook.TruncatedAlerts > 0 {
+		truncated := fmt.Sprintf("Grafana omitted %d alerts from this notification", webhook.TruncatedAlerts)
+		if alert.Message == "" {
+			alert.Message = truncated
+		} else {
+			alert.Message += "\n" + truncated
+		}
+	}
+
+	return alert
+}
+
+func normalizeGrafanaState(state string) string {
+	switch strings.ToLower(state) {
+	case "firing", "alerting":
+		return "alerting"
+	case "resolved", "ok":
+		return "ok"
+	default:
+		return strings.ToLower(state)
+	}
+}
+
+func unifiedAlertMetric(alert grafanaUnifiedAlert) string {
+	if metric := firstNonEmpty(
+		alert.Annotations["lark_metric"],
+		alert.Annotations["metric"],
+		alert.Labels["metric"],
+		alert.Labels["rulename"],
+	); metric != "" {
+		return metric
+	}
+
+	var labels []string
+	for key, value := range alert.Labels {
+		if value == "" || isInternalGrafanaLabel(key) {
+			continue
+		}
+		labels = append(labels, fmt.Sprintf("%s=%s", key, value))
+	}
+	sort.Strings(labels)
+	if len(labels) > 0 {
+		return strings.Join(labels, ", ")
+	}
+
+	return firstNonEmpty(alert.Labels["alertname"], "alert")
+}
+
+func unifiedAlertValue(alert grafanaUnifiedAlert) float64 {
+	if value := firstNonEmpty(alert.Annotations["lark_value"], alert.Annotations["value"]); value != "" {
+		if parsed, err := strconv.ParseFloat(value, 64); err == nil {
+			return parsed
+		}
+	}
+
+	if value, ok := alert.Values["A"]; ok && value != nil {
+		return *value
+	}
+	keys := make([]string, 0, len(alert.Values))
+	for key := range alert.Values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if alert.Values[key] != nil {
+			return *alert.Values[key]
+		}
+	}
+
+	return 0
+}
+
+func isInternalGrafanaLabel(label string) bool {
+	switch label {
+	case "alertname", "grafana_folder", "grafana_rule_uid", "rule_uid", "rulename":
+		return true
+	default:
+		return strings.HasPrefix(label, "__")
+	}
+}
+
+func firstAlertLabel(alerts []grafanaUnifiedAlert, key string) string {
+	for _, alert := range alerts {
+		if value := alert.Labels[key]; value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func firstAlertAnnotation(alerts []grafanaUnifiedAlert, key string) string {
+	for _, alert := range alerts {
+		if value := alert.Annotations[key]; value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func formatGrafanaAlert(channel service.Channel, alert service.GrafanaAlert) any {
