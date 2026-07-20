@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -132,7 +133,15 @@ func normalizeUnifiedGrafanaAlert(webhook grafanaUnifiedWebhook) service.Grafana
 		State:    state,
 		RuleName: ruleName,
 		Message:  message,
+		SortOrder: strings.ToLower(firstMeaningful(
+			webhook.CommonAnnotations["notify_sort_order"],
+			firstAlertAnnotation(webhook.Alerts, "notify_sort_order"),
+		)),
 	}
+	alert.SortAbs, _ = strconv.ParseBool(firstMeaningful(
+		webhook.CommonAnnotations["notify_sort_abs"],
+		firstAlertAnnotation(webhook.Alerts, "notify_sort_abs"),
+	))
 	if state == "alerting" {
 		for _, item := range webhook.Alerts {
 			itemState := normalizeGrafanaState(item.Status)
@@ -157,10 +166,12 @@ func normalizeUnifiedGrafanaAlert(webhook grafanaUnifiedWebhook) service.Grafana
 				continue
 			}
 			alert.EvalMatches = append(alert.EvalMatches, service.EvalMatch{
-				Metric: unifiedAlertMetric(item),
-				Value:  value,
+				Metric:  unifiedAlertMetric(item),
+				Value:   value,
+				SortKey: firstMeaningful(item.Annotations["notify_sort_key"]),
 			})
 		}
+		sortGrafanaEvalMatches(&alert)
 	}
 
 	if webhook.TruncatedAlerts > 0 {
@@ -173,6 +184,54 @@ func normalizeUnifiedGrafanaAlert(webhook grafanaUnifiedWebhook) service.Grafana
 	}
 
 	return alert
+}
+
+func sortGrafanaEvalMatches(alert *service.GrafanaAlert) {
+	if len(alert.EvalMatches) < 2 || alert.SortOrder == "" {
+		return
+	}
+
+	descending := alert.SortOrder == "desc"
+	sort.SliceStable(alert.EvalMatches, func(i, j int) bool {
+		left := alert.EvalMatches[i]
+		right := alert.EvalMatches[j]
+		if left.SortKey == "" || right.SortKey == "" {
+			if left.SortKey == right.SortKey {
+				return left.Metric < right.Metric
+			}
+			return left.SortKey != ""
+		}
+
+		comparison := compareGrafanaSortKeys(left.SortKey, right.SortKey, alert.SortAbs)
+		if comparison == 0 {
+			return left.Metric < right.Metric
+		}
+		if descending {
+			return comparison > 0
+		}
+		return comparison < 0
+	})
+}
+
+func compareGrafanaSortKeys(left, right string, absolute bool) int {
+	leftNumber, leftErr := strconv.ParseFloat(left, 64)
+	rightNumber, rightErr := strconv.ParseFloat(right, 64)
+	if leftErr == nil && rightErr == nil {
+		if absolute {
+			leftNumber = math.Abs(leftNumber)
+			rightNumber = math.Abs(rightNumber)
+		}
+		switch {
+		case leftNumber < rightNumber:
+			return -1
+		case leftNumber > rightNumber:
+			return 1
+		default:
+			return 0
+		}
+	}
+
+	return strings.Compare(strings.ToLower(left), strings.ToLower(right))
 }
 
 func normalizeGrafanaState(state string) string {

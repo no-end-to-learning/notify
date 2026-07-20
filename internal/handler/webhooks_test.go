@@ -115,6 +115,67 @@ func TestDecodeGrafanaAlertUnifiedResolved(t *testing.T) {
 	}
 }
 
+func TestDecodeGrafanaAlertUnifiedSortsMatches(t *testing.T) {
+	body := []byte(`{
+		"receiver":"Lark - Test",
+		"status":"firing",
+		"commonLabels":{"alertname":"Position mismatch"},
+		"commonAnnotations":{"notify_sort_order":"desc","notify_sort_abs":"true"},
+		"alerts":[
+			{
+				"status":"firing",
+				"labels":{"alertname":"Position mismatch","currency":"ROAM"},
+				"annotations":{"lark_metric":"ROAM","lark_value":"200","notify_sort_key":"-200"},
+				"values":{"A":200}
+			},
+			{
+				"status":"firing",
+				"labels":{"alertname":"Position mismatch","currency":"H"},
+				"annotations":{"lark_metric":"H","lark_value":"500","notify_sort_key":"500"},
+				"values":{"A":500}
+			},
+			{
+				"status":"firing",
+				"labels":{"alertname":"Position mismatch","currency":"ADA"},
+				"annotations":{"lark_metric":"ADA","lark_value":"500","notify_sort_key":"-500"},
+				"values":{"A":500}
+			}
+		]
+	}`)
+
+	got, _, err := decodeGrafanaAlert(body)
+	if err != nil {
+		t.Fatalf("decodeGrafanaAlert() error = %v", err)
+	}
+	wantMetrics := []string{"ADA", "H", "ROAM"}
+	for i, metric := range wantMetrics {
+		if got.EvalMatches[i].Metric != metric {
+			t.Fatalf("EvalMatches[%d].Metric = %q, want %q", i, got.EvalMatches[i].Metric, metric)
+		}
+	}
+}
+
+func TestDecodeGrafanaAlertUnifiedSortsTextAscending(t *testing.T) {
+	body := []byte(`{
+		"receiver":"Lark - Test",
+		"status":"firing",
+		"commonLabels":{"alertname":"New symbol"},
+		"commonAnnotations":{"notify_sort_order":"asc"},
+		"alerts":[
+			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"lark_metric":"ZETA","lark_value":"1","notify_sort_key":"ZETA"}},
+			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"lark_metric":"ADA","lark_value":"1","notify_sort_key":"ADA"}}
+		]
+	}`)
+
+	got, _, err := decodeGrafanaAlert(body)
+	if err != nil {
+		t.Fatalf("decodeGrafanaAlert() error = %v", err)
+	}
+	if got.EvalMatches[0].Metric != "ADA" || got.EvalMatches[1].Metric != "ZETA" {
+		t.Fatalf("EvalMatches = %#v", got.EvalMatches)
+	}
+}
+
 func TestDecodeGrafanaAlertUnifiedFallbackFields(t *testing.T) {
 	body := []byte(`{
 		"receiver":"Lark - Test",
