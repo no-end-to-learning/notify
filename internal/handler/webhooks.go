@@ -192,17 +192,37 @@ func sortGrafanaEvalMatches(alert *service.GrafanaAlert) {
 	}
 
 	descending := alert.SortOrder == "desc"
+	textSort := false
+	for _, item := range alert.EvalMatches {
+		if item.SortKey == "" {
+			continue
+		}
+		if _, err := strconv.ParseFloat(item.SortKey, 64); err != nil {
+			textSort = true
+			break
+		}
+	}
 	sort.SliceStable(alert.EvalMatches, func(i, j int) bool {
 		left := alert.EvalMatches[i]
 		right := alert.EvalMatches[j]
-		if left.SortKey == "" || right.SortKey == "" {
-			if left.SortKey == right.SortKey {
+		leftKey := left.SortKey
+		rightKey := right.SortKey
+		if textSort {
+			if leftKey == "" {
+				leftKey = left.Metric
+			}
+			if rightKey == "" {
+				rightKey = right.Metric
+			}
+		}
+		if leftKey == "" || rightKey == "" {
+			if leftKey == rightKey {
 				return left.Metric < right.Metric
 			}
-			return left.SortKey != ""
+			return leftKey != ""
 		}
 
-		comparison := compareGrafanaSortKeys(left.SortKey, right.SortKey, alert.SortAbs)
+		comparison := compareGrafanaSortKeys(leftKey, rightKey, alert.SortAbs)
 		if comparison == 0 {
 			return left.Metric < right.Metric
 		}

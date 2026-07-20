@@ -163,7 +163,7 @@ func TestDecodeGrafanaAlertUnifiedSortsTextAscending(t *testing.T) {
 		"commonAnnotations":{"notify_sort_order":"asc"},
 		"alerts":[
 			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"lark_metric":"ZETA","lark_value":"1","notify_sort_key":"ZETA"}},
-			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"lark_metric":"ADA","lark_value":"1","notify_sort_key":"ADA"}}
+			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"lark_metric":"ADA","lark_value":"1"}}
 		]
 	}`)
 
