@@ -35,18 +35,3 @@ type ChatItem struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 }
-
-type GrafanaAlert struct {
-	State       string      `json:"state"`
-	RuleName    string      `json:"ruleName"`
-	Message     string      `json:"message,omitempty"`
-	EvalMatches []EvalMatch `json:"evalMatches,omitempty"`
-	SortOrder   string      `json:"-"`
-	SortAbs     bool        `json:"-"`
-}
-
-type EvalMatch struct {
-	Metric  string  `json:"metric"`
-	Value   float64 `json:"value"`
-	SortKey string  `json:"-"`
-}

@@ -7,7 +7,7 @@
 - 统一 API 接口，通过 `channel` 参数切换通知渠道
 - 支持飞书卡片消息
 - 支持 Telegram Bot
-- Grafana 7 旧版告警与 Grafana 13 统一告警集成
+- Grafana 13 统一告警集成
 - 内置消息队列与自动限频重试
 
 ## 快速开始
@@ -124,8 +124,8 @@ Content-Type: application/json
 - `channel`: `feishu` 或 `telegram`
 - `target`: 接收目标 ID
 
-接口会自动识别 Grafana 7 旧版 Webhook 和 Grafana 13 统一告警 Webhook。统一告警可通过
-`lark_metric`、`lark_value` 和 `lark_message` annotations 保持与旧版相同的消息结构；未设置时会从
+接口只接受 Grafana 13 统一告警 Webhook。告警规则可通过
+`lark_metric`、`lark_value` 和 `lark_message` annotations 定义稳定的消息结构；未设置时会从
 告警标签和查询值生成默认内容。同一通知组中已恢复的告警项不会出现在当前异常列表中。
 
 统一告警可以通过 `notify_sort_key` 和 `notify_sort_order` annotations 对当前异常列表排序，
@@ -136,11 +136,29 @@ Content-Type: application/json
 
 ```json
 {
-  "state": "alerting",
-  "ruleName": "CPU 使用率过高",
-  "message": "当前 CPU 使用率超过 90%",
-  "evalMatches": [
-    { "metric": "cpu_usage", "value": 95.5 }
+  "receiver": "Lark - 监控 - 程序",
+  "status": "firing",
+  "commonLabels": {
+    "alertname": "CPU 使用率过高"
+  },
+  "commonAnnotations": {
+    "lark_message": "当前 CPU 使用率超过 90%"
+  },
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "CPU 使用率过高",
+        "instance": "server-01"
+      },
+      "annotations": {
+        "lark_metric": "server-01, CPU 使用率",
+        "lark_value": "95.5"
+      },
+      "values": {
+        "A": 95.5
+      }
+    }
   ]
 }
 ```

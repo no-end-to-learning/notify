@@ -37,17 +37,16 @@ func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	alert, payloadFormat, err := decodeGrafanaAlert(body)
+	alert, err := decodeGrafanaAlert(body)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid request body")
 		return
 	}
 
 	slog.Info("Grafana alert received",
-		"format", payloadFormat,
 		"state", alert.State,
 		"ruleName", alert.RuleName,
-		"matches", len(alert.EvalMatches),
+		"matches", len(alert.Matches),
 		"bodyBytes", len(body),
 	)
 
@@ -65,56 +64,58 @@ func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-type grafanaUnifiedWebhook struct {
+type grafanaWebhook struct {
 	Receiver          string                `json:"receiver"`
 	Status            string                `json:"status"`
-	State             string                `json:"state"`
 	Title             string                `json:"title"`
 	Message           string                `json:"message"`
-	Alerts            []grafanaUnifiedAlert `json:"alerts"`
+	Alerts            []grafanaWebhookAlert `json:"alerts"`
 	GroupLabels       map[string]string     `json:"groupLabels"`
 	CommonLabels      map[string]string     `json:"commonLabels"`
 	CommonAnnotations map[string]string     `json:"commonAnnotations"`
 	TruncatedAlerts   int                   `json:"truncatedAlerts"`
 }
 
-type grafanaUnifiedAlert struct {
+type grafanaWebhookAlert struct {
 	Status      string              `json:"status"`
 	Labels      map[string]string   `json:"labels"`
 	Annotations map[string]string   `json:"annotations"`
 	Values      map[string]*float64 `json:"values"`
 }
 
-func decodeGrafanaAlert(body []byte) (service.GrafanaAlert, string, error) {
-	var legacy service.GrafanaAlert
-	if err := json.Unmarshal(body, &legacy); err != nil {
-		return service.GrafanaAlert{}, "", err
-	}
-
-	var unified grafanaUnifiedWebhook
-	if err := json.Unmarshal(body, &unified); err != nil {
-		return service.GrafanaAlert{}, "", err
-	}
-
-	if isUnifiedGrafanaWebhook(unified) {
-		return normalizeUnifiedGrafanaAlert(unified), "unified", nil
-	}
-	if legacy.RuleName == "" && legacy.State == "" && legacy.EvalMatches == nil {
-		return service.GrafanaAlert{}, "", fmt.Errorf("unsupported Grafana webhook payload")
-	}
-
-	return legacy, "legacy", nil
+type grafanaNotification struct {
+	State     string
+	RuleName  string
+	Message   string
+	Matches   []grafanaMatch
+	SortOrder string
+	SortAbs   bool
 }
 
-func isUnifiedGrafanaWebhook(webhook grafanaUnifiedWebhook) bool {
-	return webhook.Receiver != "" || webhook.Status != "" || len(webhook.Alerts) > 0
+type grafanaMatch struct {
+	Metric  string
+	Value   float64
+	SortKey string
 }
 
-func normalizeUnifiedGrafanaAlert(webhook grafanaUnifiedWebhook) service.GrafanaAlert {
+func decodeGrafanaAlert(body []byte) (grafanaNotification, error) {
+	var webhook grafanaWebhook
+	if err := json.Unmarshal(body, &webhook); err != nil {
+		return grafanaNotification{}, err
+	}
+	if webhook.Receiver == "" || webhook.Status == "" || webhook.Alerts == nil {
+		return grafanaNotification{}, fmt.Errorf("unsupported Grafana webhook payload")
+	}
+
+	alert := normalizeGrafanaAlert(webhook)
+	if alert.RuleName == "" || (alert.State != "alerting" && alert.State != "ok") {
+		return grafanaNotification{}, fmt.Errorf("invalid Grafana webhook payload")
+	}
+	return alert, nil
+}
+
+func normalizeGrafanaAlert(webhook grafanaWebhook) grafanaNotification {
 	state := normalizeGrafanaState(webhook.Status)
-	if state == "" {
-		state = normalizeGrafanaState(webhook.State)
-	}
 
 	ruleName := firstNonEmpty(
 		webhook.CommonLabels["alertname"],
@@ -129,7 +130,7 @@ func normalizeUnifiedGrafanaAlert(webhook grafanaUnifiedWebhook) service.Grafana
 		firstAlertAnnotation(webhook.Alerts, "message"),
 	)
 
-	alert := service.GrafanaAlert{
+	alert := grafanaNotification{
 		State:    state,
 		RuleName: ruleName,
 		Message:  message,
@@ -161,17 +162,17 @@ func normalizeUnifiedGrafanaAlert(webhook grafanaUnifiedWebhook) service.Grafana
 				continue
 			}
 
-			value, ok := unifiedAlertValue(item)
+			value, ok := grafanaAlertValue(item)
 			if !ok {
 				continue
 			}
-			alert.EvalMatches = append(alert.EvalMatches, service.EvalMatch{
-				Metric:  unifiedAlertMetric(item),
+			alert.Matches = append(alert.Matches, grafanaMatch{
+				Metric:  grafanaAlertMetric(item),
 				Value:   value,
 				SortKey: firstMeaningful(item.Annotations["notify_sort_key"]),
 			})
 		}
-		sortGrafanaEvalMatches(&alert)
+		sortGrafanaMatches(&alert)
 	}
 
 	if webhook.TruncatedAlerts > 0 {
@@ -186,14 +187,14 @@ func normalizeUnifiedGrafanaAlert(webhook grafanaUnifiedWebhook) service.Grafana
 	return alert
 }
 
-func sortGrafanaEvalMatches(alert *service.GrafanaAlert) {
-	if len(alert.EvalMatches) < 2 || alert.SortOrder == "" {
+func sortGrafanaMatches(alert *grafanaNotification) {
+	if len(alert.Matches) < 2 || alert.SortOrder == "" {
 		return
 	}
 
 	descending := alert.SortOrder == "desc"
 	textSort := false
-	for _, item := range alert.EvalMatches {
+	for _, item := range alert.Matches {
 		if item.SortKey == "" {
 			continue
 		}
@@ -202,9 +203,9 @@ func sortGrafanaEvalMatches(alert *service.GrafanaAlert) {
 			break
 		}
 	}
-	sort.SliceStable(alert.EvalMatches, func(i, j int) bool {
-		left := alert.EvalMatches[i]
-		right := alert.EvalMatches[j]
+	sort.SliceStable(alert.Matches, func(i, j int) bool {
+		left := alert.Matches[i]
+		right := alert.Matches[j]
 		leftKey := left.SortKey
 		rightKey := right.SortKey
 		if textSort {
@@ -265,7 +266,7 @@ func normalizeGrafanaState(state string) string {
 	}
 }
 
-func unifiedAlertMetric(alert grafanaUnifiedAlert) string {
+func grafanaAlertMetric(alert grafanaWebhookAlert) string {
 	if metric := firstMeaningful(
 		alert.Annotations["lark_metric"],
 		alert.Annotations["metric"],
@@ -290,7 +291,7 @@ func unifiedAlertMetric(alert grafanaUnifiedAlert) string {
 	return firstMeaningful(alert.Labels["alertname"], "alert")
 }
 
-func unifiedAlertValue(alert grafanaUnifiedAlert) (float64, bool) {
+func grafanaAlertValue(alert grafanaWebhookAlert) (float64, bool) {
 	if value := firstMeaningful(alert.Annotations["lark_value"], alert.Annotations["value"]); value != "" {
 		if parsed, err := strconv.ParseFloat(value, 64); err == nil {
 			return parsed, true
@@ -345,7 +346,7 @@ func isInternalGrafanaLabel(label string) bool {
 	}
 }
 
-func firstAlertLabel(alerts []grafanaUnifiedAlert, key string) string {
+func firstAlertLabel(alerts []grafanaWebhookAlert, key string) string {
 	for _, alert := range alerts {
 		if value := alert.Labels[key]; value != "" {
 			return value
@@ -354,7 +355,7 @@ func firstAlertLabel(alerts []grafanaUnifiedAlert, key string) string {
 	return ""
 }
 
-func firstAlertAnnotation(alerts []grafanaUnifiedAlert, key string) string {
+func firstAlertAnnotation(alerts []grafanaWebhookAlert, key string) string {
 	for _, alert := range alerts {
 		if value := alert.Annotations[key]; value != "" {
 			return value
@@ -372,7 +373,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func formatGrafanaAlert(channel service.Channel, alert service.GrafanaAlert) any {
+func formatGrafanaAlert(channel service.Channel, alert grafanaNotification) any {
 	switch channel {
 	case service.ChannelTelegram:
 		return formatGrafanaAlertForTelegram(alert)
@@ -381,7 +382,7 @@ func formatGrafanaAlert(channel service.Channel, alert service.GrafanaAlert) any
 	}
 }
 
-func formatGrafanaAlertForFeishu(alert service.GrafanaAlert) map[string]any {
+func formatGrafanaAlertForFeishu(alert grafanaNotification) map[string]any {
 	elements := []any{}
 	var template, title string
 
@@ -397,9 +398,9 @@ func formatGrafanaAlertForFeishu(alert service.GrafanaAlert) map[string]any {
 		title = alert.RuleName
 	}
 
-	if len(alert.EvalMatches) > 0 {
+	if len(alert.Matches) > 0 {
 		var items []string
-		for _, item := range alert.EvalMatches {
+		for _, item := range alert.Matches {
 			val := strconv.FormatFloat(item.Value, 'f', -1, 64)
 			items = append(items, fmt.Sprintf("%s: %s", item.Metric, val))
 		}
@@ -436,7 +437,7 @@ func formatGrafanaAlertForFeishu(alert service.GrafanaAlert) map[string]any {
 	}
 }
 
-func formatGrafanaAlertForTelegram(alert service.GrafanaAlert) map[string]any {
+func formatGrafanaAlertForTelegram(alert grafanaNotification) map[string]any {
 	stateEmoji := map[string]string{
 		"alerting": "⚠️",
 		"ok":       "✅",
@@ -450,10 +451,10 @@ func formatGrafanaAlertForTelegram(alert service.GrafanaAlert) map[string]any {
 	// Title: Bold
 	parts = append(parts, fmt.Sprintf("<b>%s %s</b>", emoji, service.EscapeHTML(alert.RuleName)))
 
-	// Content: EvalMatches
-	if len(alert.EvalMatches) > 0 {
+	// Content: matches
+	if len(alert.Matches) > 0 {
 		var items []string
-		for _, item := range alert.EvalMatches {
+		for _, item := range alert.Matches {
 			val := strconv.FormatFloat(item.Value, 'f', -1, 64)
 			items = append(items, fmt.Sprintf("%s: %s", service.EscapeHTML(item.Metric), val))
 		}
