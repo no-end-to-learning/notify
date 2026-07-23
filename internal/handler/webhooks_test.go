@@ -11,24 +11,24 @@ func TestDecodeGrafanaAlertFiring(t *testing.T) {
 		"status":"firing",
 		"groupLabels":{"alertname":"Position mismatch"},
 		"commonLabels":{"alertname":"Position mismatch","grafana_folder":"Arbitrage"},
-		"commonAnnotations":{"lark_message":"Current position difference exceeds the threshold"},
+		"commonAnnotations":{"description":"Current position difference exceeds the threshold"},
 		"alerts":[
 			{
 				"status":"firing",
 				"labels":{"alertname":"Position mismatch","currency":"ROAM"},
-				"annotations":{"lark_metric":"ROAM, position: 58816.2444, valuation","lark_value":"623.39"},
+				"annotations":{"summary":"ROAM, position: 58816.2444, valuation: 623.39"},
 				"values":{"A":623.39,"B":1}
 			},
 			{
 				"status":"resolved",
 				"labels":{"alertname":"Position mismatch","currency":"ES"},
-				"annotations":{"lark_metric":"ES, position: -118820.7919, valuation","lark_value":"248.34"},
+				"annotations":{"summary":"ES, position: -118820.7919, valuation: 248.34"},
 				"values":{"A":248.34,"B":1}
 			},
 			{
 				"status":"firing",
 				"labels":{"alertname":"Position mismatch","currency":"H"},
-				"annotations":{"lark_metric":"H, position: 6839.5352, valuation","lark_value":"406.92"},
+				"annotations":{"summary":"H, position: 6839.5352, valuation: 406.92"},
 				"values":{"A":406.92,"B":1}
 			}
 		]
@@ -44,8 +44,8 @@ func TestDecodeGrafanaAlertFiring(t *testing.T) {
 		RuleName: "Position mismatch",
 		Message:  "Current position difference exceeds the threshold",
 		Matches: []grafanaMatch{
-			{Metric: "ROAM, position: 58816.2444, valuation", Value: 623.39},
-			{Metric: "H, position: 6839.5352, valuation", Value: 406.92},
+			{Summary: "ROAM, position: 58816.2444, valuation: 623.39"},
+			{Summary: "H, position: 6839.5352, valuation: 406.92"},
 		},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -61,6 +61,7 @@ func TestDecodeGrafanaAlertResolved(t *testing.T) {
 		"alerts":[{
 			"status":"resolved",
 			"labels":{"alertname":"Runner error log count","instance_id":"221"},
+			"annotations":{"summary":"实例编号：221；错误日志数：0"},
 			"values":{"A":0}
 		}]
 	}`)
@@ -84,19 +85,19 @@ func TestDecodeGrafanaAlertSortsMatches(t *testing.T) {
 			{
 				"status":"firing",
 				"labels":{"alertname":"Position mismatch","currency":"ROAM"},
-				"annotations":{"lark_metric":"ROAM","lark_value":"200","notify_sort_key":"-200"},
+				"annotations":{"summary":"ROAM：200","notify_sort_key":"-200"},
 				"values":{"A":200}
 			},
 			{
 				"status":"firing",
 				"labels":{"alertname":"Position mismatch","currency":"H"},
-				"annotations":{"lark_metric":"H","lark_value":"500","notify_sort_key":"500"},
+				"annotations":{"summary":"H：500","notify_sort_key":"500"},
 				"values":{"A":500}
 			},
 			{
 				"status":"firing",
 				"labels":{"alertname":"Position mismatch","currency":"ADA"},
-				"annotations":{"lark_metric":"ADA","lark_value":"500","notify_sort_key":"-500"},
+				"annotations":{"summary":"ADA：500","notify_sort_key":"-500"},
 				"values":{"A":500}
 			}
 		]
@@ -106,10 +107,10 @@ func TestDecodeGrafanaAlertSortsMatches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decodeGrafanaAlert() error = %v", err)
 	}
-	wantMetrics := []string{"ADA", "H", "ROAM"}
-	for i, metric := range wantMetrics {
-		if got.Matches[i].Metric != metric {
-			t.Fatalf("Matches[%d].Metric = %q, want %q", i, got.Matches[i].Metric, metric)
+	wantSummaries := []string{"ADA：500", "H：500", "ROAM：200"}
+	for i, summary := range wantSummaries {
+		if got.Matches[i].Summary != summary {
+			t.Fatalf("Matches[%d].Summary = %q, want %q", i, got.Matches[i].Summary, summary)
 		}
 	}
 }
@@ -121,8 +122,8 @@ func TestDecodeGrafanaAlertSortsTextAscending(t *testing.T) {
 		"commonLabels":{"alertname":"New symbol"},
 		"commonAnnotations":{"notify_sort_order":"asc"},
 		"alerts":[
-			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"lark_metric":"ZETA","lark_value":"1","notify_sort_key":"ZETA"}},
-			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"lark_metric":"ADA","lark_value":"1"}}
+			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"summary":"ZETA：1","notify_sort_key":"ZETA"}},
+			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"summary":"ADA：1"}}
 		]
 	}`)
 
@@ -130,12 +131,68 @@ func TestDecodeGrafanaAlertSortsTextAscending(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decodeGrafanaAlert() error = %v", err)
 	}
-	if got.Matches[0].Metric != "ADA" || got.Matches[1].Metric != "ZETA" {
+	if got.Matches[0].Summary != "ADA：1" || got.Matches[1].Summary != "ZETA：1" {
 		t.Fatalf("Matches = %#v", got.Matches)
 	}
 }
 
-func TestDecodeGrafanaAlertFallbackFields(t *testing.T) {
+func TestDecodeGrafanaAlertSummary(t *testing.T) {
+	body := []byte(`{
+		"receiver":"Lark - Test",
+		"status":"firing",
+		"commonLabels":{"alertname":"现货与合约头寸差异过大"},
+		"alerts":[
+			{
+				"status":"firing",
+				"labels":{"alertname":"现货与合约头寸差异过大","currency":"ES"},
+				"annotations":{"summary":"基础币：ES；头寸：-230911.4119；估值：248.34","notify_sort_key":"248.34"},
+				"values":{"R":248.34,"RB":-230911.4119}
+			}
+		]
+	}`)
+
+	got, err := decodeGrafanaAlert(body)
+	if err != nil {
+		t.Fatalf("decodeGrafanaAlert() error = %v", err)
+	}
+	want := grafanaNotification{
+		State:    "alerting",
+		RuleName: "现货与合约头寸差异过大",
+		Matches: []grafanaMatch{
+			{Summary: "基础币：ES；头寸：-230911.4119；估值：248.34", SortKey: "248.34"},
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("decoded alert = %#v, want %#v", got, want)
+	}
+
+	card := formatGrafanaAlertForFeishu(got)
+	elements := card["elements"].([]any)
+	content := elements[0].(map[string]any)["content"]
+	if content != "基础币：ES；头寸：-230911.4119；估值：248.34" {
+		t.Fatalf("content = %q", content)
+	}
+}
+
+func TestDecodeGrafanaAlertRequiresSummary(t *testing.T) {
+	body := []byte(`{
+		"receiver":"Lark - Test",
+		"status":"firing",
+		"commonLabels":{"alertname":"现货与合约头寸差异过大"},
+		"alerts":[{
+			"status":"firing",
+			"labels":{"alertname":"现货与合约头寸差异过大","currency":"ES"},
+			"annotations":{},
+			"values":{"R":248.34,"RB":-230911.4119}
+		}]
+	}`)
+
+	if _, err := decodeGrafanaAlert(body); err == nil {
+		t.Fatal("decodeGrafanaAlert() error = nil, want missing summary error")
+	}
+}
+
+func TestDecodeGrafanaAlertDoesNotInferSummary(t *testing.T) {
 	body := []byte(`{
 		"receiver":"Lark - Test",
 		"status":"firing",
@@ -147,19 +204,8 @@ func TestDecodeGrafanaAlertFallbackFields(t *testing.T) {
 		}]
 	}`)
 
-	got, err := decodeGrafanaAlert(body)
-	if err != nil {
-		t.Fatalf("decodeGrafanaAlert() error = %v", err)
-	}
-	want := grafanaNotification{
-		State:    "alerting",
-		RuleName: "Runner error log count",
-		Matches: []grafanaMatch{
-			{Metric: "instance_id=221, service=runner", Value: 310},
-		},
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("decoded alert = %#v, want %#v", got, want)
+	if _, err := decodeGrafanaAlert(body); err == nil {
+		t.Fatal("decodeGrafanaAlert() error = nil, want missing summary error")
 	}
 }
 
@@ -171,7 +217,7 @@ func TestDecodeGrafanaAlertDatasourceError(t *testing.T) {
 		"alerts":[{
 			"status":"firing",
 			"labels":{"alertname":"DatasourceError","datasource_uid":"al4sYqNVz","rulename":"Position mismatch"},
-			"annotations":{"Error":"database connection failed","lark_metric":"[no value]","lark_value":"[no value]"},
+			"annotations":{"Error":"database connection failed"},
 			"values":{}
 		}]
 	}`)
@@ -188,7 +234,7 @@ func TestDecodeGrafanaAlertDatasourceError(t *testing.T) {
 	}
 }
 
-func TestDecodeGrafanaAlertSkipsMissingValue(t *testing.T) {
+func TestDecodeGrafanaAlertRejectsMissingSummary(t *testing.T) {
 	body := []byte(`{
 		"receiver":"Lark - Test",
 		"status":"firing",
@@ -196,17 +242,13 @@ func TestDecodeGrafanaAlertSkipsMissingValue(t *testing.T) {
 		"alerts":[{
 			"status":"firing",
 			"labels":{"alertname":"Query warning","rulename":"Position mismatch"},
-			"annotations":{"lark_metric":"[no value]","lark_value":"[no value]"},
+			"annotations":{},
 			"values":{}
 		}]
 	}`)
 
-	got, err := decodeGrafanaAlert(body)
-	if err != nil {
-		t.Fatalf("decodeGrafanaAlert() error = %v", err)
-	}
-	if len(got.Matches) != 0 {
-		t.Fatalf("decoded alert = %#v", got)
+	if _, err := decodeGrafanaAlert(body); err == nil {
+		t.Fatal("decodeGrafanaAlert() error = nil, want missing summary error")
 	}
 }
 
@@ -216,8 +258,8 @@ func TestFormatGrafanaAlertForFeishuPreservesCard(t *testing.T) {
 		RuleName: "Position mismatch",
 		Message:  "Current position difference exceeds the threshold",
 		Matches: []grafanaMatch{
-			{Metric: "ROAM, position: 58816.2444, valuation", Value: 623.39},
-			{Metric: "H, position: 6839.5352, valuation", Value: 406.92},
+			{Summary: "ROAM, position: 58816.2444, valuation: 623.39"},
+			{Summary: "H, position: 6839.5352, valuation: 406.92"},
 		},
 	}
 

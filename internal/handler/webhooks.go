@@ -93,8 +93,7 @@ type grafanaNotification struct {
 }
 
 type grafanaMatch struct {
-	Metric  string
-	Value   float64
+	Summary string
 	SortKey string
 }
 
@@ -107,33 +106,31 @@ func decodeGrafanaAlert(body []byte) (grafanaNotification, error) {
 		return grafanaNotification{}, fmt.Errorf("unsupported Grafana webhook payload")
 	}
 
-	alert := normalizeGrafanaAlert(webhook)
+	alert, err := normalizeGrafanaAlert(webhook)
+	if err != nil {
+		return grafanaNotification{}, err
+	}
 	if alert.RuleName == "" || (alert.State != "alerting" && alert.State != "ok") {
 		return grafanaNotification{}, fmt.Errorf("invalid Grafana webhook payload")
 	}
 	return alert, nil
 }
 
-func normalizeGrafanaAlert(webhook grafanaWebhook) grafanaNotification {
+func normalizeGrafanaAlert(webhook grafanaWebhook) (grafanaNotification, error) {
 	state := normalizeGrafanaState(webhook.Status)
-
 	ruleName := firstNonEmpty(
 		webhook.CommonLabels["alertname"],
 		webhook.GroupLabels["alertname"],
 		firstAlertLabel(webhook.Alerts, "alertname"),
 		webhook.Title,
 	)
-	message := firstNonEmpty(
-		webhook.CommonAnnotations["lark_message"],
-		webhook.CommonAnnotations["message"],
-		firstAlertAnnotation(webhook.Alerts, "lark_message"),
-		firstAlertAnnotation(webhook.Alerts, "message"),
-	)
-
 	alert := grafanaNotification{
 		State:    state,
 		RuleName: ruleName,
-		Message:  message,
+		Message: firstNonEmpty(
+			webhook.CommonAnnotations["description"],
+			firstAlertAnnotation(webhook.Alerts, "description"),
+		),
 		SortOrder: strings.ToLower(firstMeaningful(
 			webhook.CommonAnnotations["notify_sort_order"],
 			firstAlertAnnotation(webhook.Alerts, "notify_sort_order"),
@@ -162,13 +159,12 @@ func normalizeGrafanaAlert(webhook grafanaWebhook) grafanaNotification {
 				continue
 			}
 
-			value, ok := grafanaAlertValue(item)
-			if !ok {
-				continue
+			summary := firstMeaningful(item.Annotations["summary"])
+			if summary == "" {
+				return grafanaNotification{}, fmt.Errorf("Grafana alert is missing summary")
 			}
 			alert.Matches = append(alert.Matches, grafanaMatch{
-				Metric:  grafanaAlertMetric(item),
-				Value:   value,
+				Summary: summary,
 				SortKey: firstMeaningful(item.Annotations["notify_sort_key"]),
 			})
 		}
@@ -184,7 +180,7 @@ func normalizeGrafanaAlert(webhook grafanaWebhook) grafanaNotification {
 		}
 	}
 
-	return alert
+	return alert, nil
 }
 
 func sortGrafanaMatches(alert *grafanaNotification) {
@@ -210,28 +206,32 @@ func sortGrafanaMatches(alert *grafanaNotification) {
 		rightKey := right.SortKey
 		if textSort {
 			if leftKey == "" {
-				leftKey = left.Metric
+				leftKey = grafanaMatchText(left)
 			}
 			if rightKey == "" {
-				rightKey = right.Metric
+				rightKey = grafanaMatchText(right)
 			}
 		}
 		if leftKey == "" || rightKey == "" {
 			if leftKey == rightKey {
-				return left.Metric < right.Metric
+				return grafanaMatchText(left) < grafanaMatchText(right)
 			}
 			return leftKey != ""
 		}
 
 		comparison := compareGrafanaSortKeys(leftKey, rightKey, alert.SortAbs)
 		if comparison == 0 {
-			return left.Metric < right.Metric
+			return grafanaMatchText(left) < grafanaMatchText(right)
 		}
 		if descending {
 			return comparison > 0
 		}
 		return comparison < 0
 	})
+}
+
+func grafanaMatchText(match grafanaMatch) string {
+	return match.Summary
 }
 
 func compareGrafanaSortKeys(left, right string, absolute bool) int {
@@ -266,55 +266,6 @@ func normalizeGrafanaState(state string) string {
 	}
 }
 
-func grafanaAlertMetric(alert grafanaWebhookAlert) string {
-	if metric := firstMeaningful(
-		alert.Annotations["lark_metric"],
-		alert.Annotations["metric"],
-		alert.Labels["metric"],
-		alert.Labels["rulename"],
-	); metric != "" {
-		return metric
-	}
-
-	var labels []string
-	for key, value := range alert.Labels {
-		if value == "" || isInternalGrafanaLabel(key) {
-			continue
-		}
-		labels = append(labels, fmt.Sprintf("%s=%s", key, value))
-	}
-	sort.Strings(labels)
-	if len(labels) > 0 {
-		return strings.Join(labels, ", ")
-	}
-
-	return firstMeaningful(alert.Labels["alertname"], "alert")
-}
-
-func grafanaAlertValue(alert grafanaWebhookAlert) (float64, bool) {
-	if value := firstMeaningful(alert.Annotations["lark_value"], alert.Annotations["value"]); value != "" {
-		if parsed, err := strconv.ParseFloat(value, 64); err == nil {
-			return parsed, true
-		}
-	}
-
-	if value, ok := alert.Values["A"]; ok && value != nil {
-		return *value, true
-	}
-	keys := make([]string, 0, len(alert.Values))
-	for key := range alert.Values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		if alert.Values[key] != nil {
-			return *alert.Values[key], true
-		}
-	}
-
-	return 0, false
-}
-
 func appendMessage(message, addition string) string {
 	if message == "" {
 		return addition
@@ -335,15 +286,6 @@ func firstMeaningful(values ...string) string {
 		}
 	}
 	return ""
-}
-
-func isInternalGrafanaLabel(label string) bool {
-	switch label {
-	case "alertname", "grafana_folder", "grafana_rule_uid", "rule_uid", "rulename":
-		return true
-	default:
-		return strings.HasPrefix(label, "__")
-	}
 }
 
 func firstAlertLabel(alerts []grafanaWebhookAlert, key string) string {
@@ -401,8 +343,7 @@ func formatGrafanaAlertForFeishu(alert grafanaNotification) map[string]any {
 	if len(alert.Matches) > 0 {
 		var items []string
 		for _, item := range alert.Matches {
-			val := strconv.FormatFloat(item.Value, 'f', -1, 64)
-			items = append(items, fmt.Sprintf("%s: %s", item.Metric, val))
+			items = append(items, item.Summary)
 		}
 		elements = append(elements, map[string]any{
 			"tag":     "markdown",
@@ -455,8 +396,7 @@ func formatGrafanaAlertForTelegram(alert grafanaNotification) map[string]any {
 	if len(alert.Matches) > 0 {
 		var items []string
 		for _, item := range alert.Matches {
-			val := strconv.FormatFloat(item.Value, 'f', -1, 64)
-			items = append(items, fmt.Sprintf("%s: %s", service.EscapeHTML(item.Metric), val))
+			items = append(items, service.EscapeHTML(item.Summary))
 		}
 		parts = append(parts, strings.Join(items, "\n"))
 	}

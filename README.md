@@ -124,9 +124,9 @@ Content-Type: application/json
 - `channel`: `feishu` 或 `telegram`
 - `target`: 接收目标 ID
 
-接口只接受 Grafana 13 统一告警 Webhook。告警规则可通过
-`lark_metric`、`lark_value` 和 `lark_message` annotations 定义稳定的消息结构；未设置时会从
-告警标签和查询值生成默认内容。同一通知组中已恢复的告警项不会出现在当前异常列表中。
+接口只接受 Grafana 13 统一告警 Webhook。每个 firing 告警实例必须提供完整的 `summary` annotation，
+缺失时接口返回错误，不从标签或查询值推断消息内容。`description` annotation 可用于补充规则说明。
+同一通知组中已恢复的告警项不会出现在当前异常列表中。
 
 统一告警可以通过 `notify_sort_key` 和 `notify_sort_order` annotations 对当前异常列表排序，
 `notify_sort_order` 支持 `asc` 和 `desc`。数值排序需要忽略正负号时，可以设置
@@ -141,9 +141,6 @@ Content-Type: application/json
   "commonLabels": {
     "alertname": "CPU 使用率过高"
   },
-  "commonAnnotations": {
-    "lark_message": "当前 CPU 使用率超过 90%"
-  },
   "alerts": [
     {
       "status": "firing",
@@ -152,8 +149,7 @@ Content-Type: application/json
         "instance": "server-01"
       },
       "annotations": {
-        "lark_metric": "server-01, CPU 使用率",
-        "lark_value": "95.5"
+        "summary": "实例：server-01；CPU 使用率：95.5%"
       },
       "values": {
         "A": 95.5
