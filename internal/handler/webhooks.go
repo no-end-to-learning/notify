@@ -137,21 +137,21 @@ func normalizeGrafanaAlert(webhook grafanaWebhook) (grafanaNotification, error) 
 		State:    state,
 		RuleName: ruleName,
 		NotificationType: grafanaNotificationType(strings.ToLower(firstMeaningful(
-			webhook.CommonAnnotations["notification_type"],
-			firstAlertAnnotation(webhook.Alerts, "notification_type"),
+			webhook.CommonAnnotations["notificationType"],
+			firstAlertAnnotation(webhook.Alerts, "notificationType"),
 		))),
 		Message: firstNonEmpty(
 			webhook.CommonAnnotations["description"],
 			firstAlertAnnotation(webhook.Alerts, "description"),
 		),
 		SortOrder: strings.ToLower(firstMeaningful(
-			webhook.CommonAnnotations["notify_sort_order"],
-			firstAlertAnnotation(webhook.Alerts, "notify_sort_order"),
+			webhook.CommonAnnotations["notificationSortOrder"],
+			firstAlertAnnotation(webhook.Alerts, "notificationSortOrder"),
 		)),
 	}
 	alert.SortAbs, _ = strconv.ParseBool(firstMeaningful(
-		webhook.CommonAnnotations["notify_sort_abs"],
-		firstAlertAnnotation(webhook.Alerts, "notify_sort_abs"),
+		webhook.CommonAnnotations["notificationSortAbsolute"],
+		firstAlertAnnotation(webhook.Alerts, "notificationSortAbsolute"),
 	))
 	if state == "alerting" {
 		for _, item := range webhook.Alerts {
@@ -178,7 +178,7 @@ func normalizeGrafanaAlert(webhook grafanaWebhook) (grafanaNotification, error) 
 			}
 			alert.Matches = append(alert.Matches, grafanaMatch{
 				Summary: summary,
-				SortKey: firstMeaningful(item.Annotations["notify_sort_key"]),
+				SortKey: firstMeaningful(item.Annotations["notificationSortKey"]),
 			})
 		}
 		sortGrafanaMatches(&alert)

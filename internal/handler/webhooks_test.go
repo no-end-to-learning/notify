@@ -11,7 +11,7 @@ func TestDecodeGrafanaAlertFiring(t *testing.T) {
 		"status":"firing",
 		"groupLabels":{"alertname":"Position mismatch"},
 		"commonLabels":{"alertname":"Position mismatch","grafana_folder":"Arbitrage"},
-		"commonAnnotations":{"description":"Current position difference exceeds the threshold","notification_type":"alert"},
+		"commonAnnotations":{"description":"Current position difference exceeds the threshold","notificationType":"alert"},
 		"alerts":[
 			{
 				"status":"firing",
@@ -81,11 +81,11 @@ func TestDecodeGrafanaReportType(t *testing.T) {
 		"receiver":"Lark - Operations",
 		"status":"firing",
 		"commonLabels":{"alertname":"昨日新上线策略表现"},
-		"commonAnnotations":{"notification_type":"report"},
+		"commonAnnotations":{"notificationType":"report"},
 		"alerts":[{
 			"status":"firing",
 			"labels":{"alertname":"昨日新上线策略表现"},
-			"annotations":{"notification_type":"report","summary":"1.1 策略数: 10"},
+			"annotations":{"notificationType":"report","summary":"1.1 策略数: 10"},
 			"values":{"A":1}
 		}]
 	}`)
@@ -110,24 +110,24 @@ func TestDecodeGrafanaAlertSortsMatches(t *testing.T) {
 		"receiver":"Lark - Test",
 		"status":"firing",
 		"commonLabels":{"alertname":"Position mismatch"},
-		"commonAnnotations":{"notify_sort_order":"desc","notify_sort_abs":"true"},
+		"commonAnnotations":{"notificationSortOrder":"desc","notificationSortAbsolute":"true"},
 		"alerts":[
 			{
 				"status":"firing",
 				"labels":{"alertname":"Position mismatch","currency":"ROAM"},
-				"annotations":{"summary":"ROAM：200","notify_sort_key":"-200"},
+				"annotations":{"summary":"ROAM：200","notificationSortKey":"-200"},
 				"values":{"A":200}
 			},
 			{
 				"status":"firing",
 				"labels":{"alertname":"Position mismatch","currency":"H"},
-				"annotations":{"summary":"H：500","notify_sort_key":"500"},
+				"annotations":{"summary":"H：500","notificationSortKey":"500"},
 				"values":{"A":500}
 			},
 			{
 				"status":"firing",
 				"labels":{"alertname":"Position mismatch","currency":"ADA"},
-				"annotations":{"summary":"ADA：500","notify_sort_key":"-500"},
+				"annotations":{"summary":"ADA：500","notificationSortKey":"-500"},
 				"values":{"A":500}
 			}
 		]
@@ -150,9 +150,9 @@ func TestDecodeGrafanaAlertSortsTextAscending(t *testing.T) {
 		"receiver":"Lark - Test",
 		"status":"firing",
 		"commonLabels":{"alertname":"New symbol"},
-		"commonAnnotations":{"notify_sort_order":"asc"},
+		"commonAnnotations":{"notificationSortOrder":"asc"},
 		"alerts":[
-			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"summary":"ZETA：1","notify_sort_key":"ZETA"}},
+			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"summary":"ZETA：1","notificationSortKey":"ZETA"}},
 			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"summary":"ADA：1"}}
 		]
 	}`)
@@ -175,7 +175,7 @@ func TestDecodeGrafanaAlertSummary(t *testing.T) {
 			{
 				"status":"firing",
 				"labels":{"alertname":"现货与合约头寸差异过大","currency":"ES"},
-				"annotations":{"summary":"基础币：ES；头寸：-230911.4119；估值：248.34","notify_sort_key":"248.34"},
+				"annotations":{"summary":"基础币：ES；头寸：-230911.4119；估值：248.34","notificationSortKey":"248.34"},
 				"values":{"R":248.34,"RB":-230911.4119}
 			}
 		]
