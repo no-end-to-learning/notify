@@ -46,6 +46,7 @@ func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 	slog.Info("Grafana alert received",
 		"state", alert.State,
 		"ruleName", alert.RuleName,
+		"notificationType", alert.NotificationType,
 		"matches", len(alert.Matches),
 		"bodyBytes", len(body),
 	)
@@ -83,13 +84,21 @@ type grafanaWebhookAlert struct {
 	Values      map[string]*float64 `json:"values"`
 }
 
+type grafanaNotificationType string
+
+const (
+	grafanaNotificationTypeAlert  grafanaNotificationType = "alert"
+	grafanaNotificationTypeReport grafanaNotificationType = "report"
+)
+
 type grafanaNotification struct {
-	State     string
-	RuleName  string
-	Message   string
-	Matches   []grafanaMatch
-	SortOrder string
-	SortAbs   bool
+	State            string
+	RuleName         string
+	NotificationType grafanaNotificationType
+	Message          string
+	Matches          []grafanaMatch
+	SortOrder        string
+	SortAbs          bool
 }
 
 type grafanaMatch struct {
@@ -127,6 +136,10 @@ func normalizeGrafanaAlert(webhook grafanaWebhook) (grafanaNotification, error) 
 	alert := grafanaNotification{
 		State:    state,
 		RuleName: ruleName,
+		NotificationType: grafanaNotificationType(strings.ToLower(firstMeaningful(
+			webhook.CommonAnnotations["notification_type"],
+			firstAlertAnnotation(webhook.Alerts, "notification_type"),
+		))),
 		Message: firstNonEmpty(
 			webhook.CommonAnnotations["description"],
 			firstAlertAnnotation(webhook.Alerts, "description"),
@@ -328,11 +341,14 @@ func formatGrafanaAlertForFeishu(alert grafanaNotification) map[string]any {
 	elements := []any{}
 	var template, title string
 
-	switch alert.State {
-	case "alerting":
+	switch {
+	case alert.NotificationType == grafanaNotificationTypeReport:
+		template = string(service.ColorBlue)
+		title = alert.RuleName
+	case alert.State == "alerting":
 		template = string(service.ColorOrange)
 		title = alert.RuleName
-	case "ok":
+	case alert.State == "ok":
 		template = string(service.ColorGreen)
 		title = "✅ " + alert.RuleName
 	default:

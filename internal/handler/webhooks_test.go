@@ -11,7 +11,7 @@ func TestDecodeGrafanaAlertFiring(t *testing.T) {
 		"status":"firing",
 		"groupLabels":{"alertname":"Position mismatch"},
 		"commonLabels":{"alertname":"Position mismatch","grafana_folder":"Arbitrage"},
-		"commonAnnotations":{"description":"Current position difference exceeds the threshold"},
+		"commonAnnotations":{"description":"Current position difference exceeds the threshold","notification_type":"alert"},
 		"alerts":[
 			{
 				"status":"firing",
@@ -40,9 +40,10 @@ func TestDecodeGrafanaAlertFiring(t *testing.T) {
 	}
 
 	want := grafanaNotification{
-		State:    "alerting",
-		RuleName: "Position mismatch",
-		Message:  "Current position difference exceeds the threshold",
+		State:            "alerting",
+		RuleName:         "Position mismatch",
+		NotificationType: grafanaNotificationTypeAlert,
+		Message:          "Current position difference exceeds the threshold",
 		Matches: []grafanaMatch{
 			{Summary: "ROAM, position: 58816.2444, valuation: 623.39"},
 			{Summary: "H, position: 6839.5352, valuation: 406.92"},
@@ -72,6 +73,35 @@ func TestDecodeGrafanaAlertResolved(t *testing.T) {
 	}
 	if got.State != "ok" || got.RuleName != "Runner error log count" || len(got.Matches) != 0 {
 		t.Fatalf("decoded alert = %#v", got)
+	}
+}
+
+func TestDecodeGrafanaReportType(t *testing.T) {
+	body := []byte(`{
+		"receiver":"Lark - Operations",
+		"status":"firing",
+		"commonLabels":{"alertname":"昨日新上线策略表现"},
+		"commonAnnotations":{"notification_type":"report"},
+		"alerts":[{
+			"status":"firing",
+			"labels":{"alertname":"昨日新上线策略表现"},
+			"annotations":{"notification_type":"report","summary":"1.1 策略数: 10"},
+			"values":{"A":1}
+		}]
+	}`)
+
+	got, err := decodeGrafanaAlert(body)
+	if err != nil {
+		t.Fatalf("decodeGrafanaAlert() error = %v", err)
+	}
+	if got.NotificationType != grafanaNotificationTypeReport {
+		t.Fatalf("NotificationType = %q, want report", got.NotificationType)
+	}
+
+	card := formatGrafanaAlertForFeishu(got)
+	header := card["header"].(map[string]any)
+	if header["template"] != "Blue" {
+		t.Fatalf("header = %#v", header)
 	}
 }
 
@@ -254,9 +284,10 @@ func TestDecodeGrafanaAlertRejectsMissingSummary(t *testing.T) {
 
 func TestFormatGrafanaAlertForFeishuPreservesCard(t *testing.T) {
 	alert := grafanaNotification{
-		State:    "alerting",
-		RuleName: "Position mismatch",
-		Message:  "Current position difference exceeds the threshold",
+		State:            "alerting",
+		RuleName:         "Position mismatch",
+		NotificationType: grafanaNotificationTypeAlert,
+		Message:          "Current position difference exceeds the threshold",
 		Matches: []grafanaMatch{
 			{Summary: "ROAM, position: 58816.2444, valuation: 623.39"},
 			{Summary: "H, position: 6839.5352, valuation: 406.92"},
@@ -275,6 +306,19 @@ func TestFormatGrafanaAlertForFeishuPreservesCard(t *testing.T) {
 	wantContent := "ROAM, position: 58816.2444, valuation: 623.39\nH, position: 6839.5352, valuation: 406.92"
 	if content != wantContent {
 		t.Fatalf("content = %q, want %q", content, wantContent)
+	}
+}
+
+func TestFormatGrafanaResolvedAlertForFeishuUsesGreen(t *testing.T) {
+	alert := grafanaNotification{
+		State:    "ok",
+		RuleName: "Position mismatch",
+	}
+
+	card := formatGrafanaAlertForFeishu(alert)
+	header := card["header"].(map[string]any)
+	if header["template"] != "Green" {
+		t.Fatalf("header = %#v", header)
 	}
 }
 
