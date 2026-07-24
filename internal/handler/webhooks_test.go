@@ -59,6 +59,7 @@ func TestDecodeGrafanaAlertResolved(t *testing.T) {
 		"receiver":"Lark - Test",
 		"status":"resolved",
 		"commonLabels":{"alertname":"Runner error log count"},
+		"commonAnnotations":{"notificationType":"alert"},
 		"alerts":[{
 			"status":"resolved",
 			"labels":{"alertname":"Runner error log count","instance_id":"221"},
@@ -85,7 +86,7 @@ func TestDecodeGrafanaReportType(t *testing.T) {
 		"alerts":[{
 			"status":"firing",
 			"labels":{"alertname":"昨日新上线策略表现"},
-			"annotations":{"notificationType":"report","summary":"1.1 策略数: 10"},
+			"annotations":{"summary":"1.1 策略数: 10"},
 			"values":{"A":1}
 		}]
 	}`)
@@ -105,12 +106,31 @@ func TestDecodeGrafanaReportType(t *testing.T) {
 	}
 }
 
+func TestDecodeGrafanaAlertRequiresCommonMetadata(t *testing.T) {
+	body := []byte(`{
+		"receiver":"Lark - Test",
+		"status":"firing",
+		"title":"Position mismatch",
+		"groupLabels":{"alertname":"Position mismatch"},
+		"alerts":[{
+			"status":"firing",
+			"labels":{"alertname":"Position mismatch"},
+			"annotations":{"notificationType":"alert","summary":"ROAM: 623.39U"},
+			"values":{"A":623.39}
+		}]
+	}`)
+
+	if _, err := decodeGrafanaAlert(body); err == nil {
+		t.Fatal("decodeGrafanaAlert() error = nil, want missing common metadata error")
+	}
+}
+
 func TestDecodeGrafanaAlertSortsMatches(t *testing.T) {
 	body := []byte(`{
 		"receiver":"Lark - Test",
 		"status":"firing",
 		"commonLabels":{"alertname":"Position mismatch"},
-		"commonAnnotations":{"notificationSortOrder":"desc","notificationSortAbsolute":"true"},
+		"commonAnnotations":{"notificationType":"alert","notificationSortOrder":"desc","notificationSortAbsolute":"true"},
 		"alerts":[
 			{
 				"status":"firing",
@@ -150,7 +170,7 @@ func TestDecodeGrafanaAlertSortsTextAscending(t *testing.T) {
 		"receiver":"Lark - Test",
 		"status":"firing",
 		"commonLabels":{"alertname":"New symbol"},
-		"commonAnnotations":{"notificationSortOrder":"asc"},
+		"commonAnnotations":{"notificationType":"alert","notificationSortOrder":"asc"},
 		"alerts":[
 			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"summary":"ZETA：1","notificationSortKey":"ZETA"}},
 			{"status":"firing","labels":{"alertname":"New symbol"},"annotations":{"summary":"ADA：1"}}
@@ -171,6 +191,7 @@ func TestDecodeGrafanaAlertSummary(t *testing.T) {
 		"receiver":"Lark - Test",
 		"status":"firing",
 		"commonLabels":{"alertname":"现货与合约头寸差异过大"},
+		"commonAnnotations":{"notificationType":"alert"},
 		"alerts":[
 			{
 				"status":"firing",
@@ -186,8 +207,9 @@ func TestDecodeGrafanaAlertSummary(t *testing.T) {
 		t.Fatalf("decodeGrafanaAlert() error = %v", err)
 	}
 	want := grafanaNotification{
-		State:    "alerting",
-		RuleName: "现货与合约头寸差异过大",
+		State:            "alerting",
+		RuleName:         "现货与合约头寸差异过大",
+		NotificationType: grafanaNotificationTypeAlert,
 		Matches: []grafanaMatch{
 			{Summary: "基础币：ES；头寸：-230911.4119；估值：248.34", SortKey: "248.34"},
 		},
@@ -209,6 +231,7 @@ func TestDecodeGrafanaAlertRequiresSummary(t *testing.T) {
 		"receiver":"Lark - Test",
 		"status":"firing",
 		"commonLabels":{"alertname":"现货与合约头寸差异过大"},
+		"commonAnnotations":{"notificationType":"alert"},
 		"alerts":[{
 			"status":"firing",
 			"labels":{"alertname":"现货与合约头寸差异过大","currency":"ES"},
@@ -226,6 +249,8 @@ func TestDecodeGrafanaAlertDoesNotInferSummary(t *testing.T) {
 	body := []byte(`{
 		"receiver":"Lark - Test",
 		"status":"firing",
+		"commonLabels":{"alertname":"Runner error log count"},
+		"commonAnnotations":{"notificationType":"alert"},
 		"alerts":[{
 			"status":"firing",
 			"labels":{"alertname":"Runner error log count","instance_id":"221","service":"runner"},
@@ -269,6 +294,7 @@ func TestDecodeGrafanaAlertRejectsMissingSummary(t *testing.T) {
 		"receiver":"Lark - Test",
 		"status":"firing",
 		"commonLabels":{"alertname":"Query warning"},
+		"commonAnnotations":{"notificationType":"alert"},
 		"alerts":[{
 			"status":"firing",
 			"labels":{"alertname":"Query warning","rulename":"Position mismatch"},

@@ -128,9 +128,9 @@ Content-Type: application/json
 缺失时接口返回错误，不从标签或查询值推断消息内容。`description` annotation 可用于补充规则说明。
 同一通知组中已恢复的告警项不会出现在当前异常列表中。
 
-统一告警可以通过 `notify_sort_key` 和 `notify_sort_order` annotations 对当前异常列表排序，
-`notify_sort_order` 支持 `asc` 和 `desc`。数值排序需要忽略正负号时，可以设置
-`notify_sort_abs=true`。未设置排序字段时保持 Grafana Webhook 的原始顺序。
+统一告警可以通过 `notificationSortKey` 和 `notificationSortOrder` annotations 对当前异常列表排序，
+`notificationSortOrder` 支持 `asc` 和 `desc`。数值排序需要忽略正负号时，可以设置
+`notificationSortAbsolute=true`。未设置排序字段时保持 Grafana Webhook 的原始顺序。
 
 **Payload 示例**
 
@@ -141,6 +141,10 @@ Content-Type: application/json
   "commonLabels": {
     "alertname": "CPU 使用率过高"
   },
+  "commonAnnotations": {
+    "notificationType": "alert",
+    "notificationSortOrder": "desc"
+  },
   "alerts": [
     {
       "status": "firing",
@@ -149,7 +153,8 @@ Content-Type: application/json
         "instance": "server-01"
       },
       "annotations": {
-        "summary": "实例：server-01；CPU 使用率：95.5%"
+        "summary": "实例: server-01, CPU 使用率: 95.5%",
+        "notificationSortKey": "95.5"
       },
       "values": {
         "A": 95.5

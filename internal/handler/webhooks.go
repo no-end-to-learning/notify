@@ -68,10 +68,7 @@ func HandleGrafanaWebhook(w http.ResponseWriter, r *http.Request) {
 type grafanaWebhook struct {
 	Receiver          string                `json:"receiver"`
 	Status            string                `json:"status"`
-	Title             string                `json:"title"`
-	Message           string                `json:"message"`
 	Alerts            []grafanaWebhookAlert `json:"alerts"`
-	GroupLabels       map[string]string     `json:"groupLabels"`
 	CommonLabels      map[string]string     `json:"commonLabels"`
 	CommonAnnotations map[string]string     `json:"commonAnnotations"`
 	TruncatedAlerts   int                   `json:"truncatedAlerts"`
@@ -127,44 +124,45 @@ func decodeGrafanaAlert(body []byte) (grafanaNotification, error) {
 
 func normalizeGrafanaAlert(webhook grafanaWebhook) (grafanaNotification, error) {
 	state := normalizeGrafanaState(webhook.Status)
-	ruleName := firstNonEmpty(
-		webhook.CommonLabels["alertname"],
-		webhook.GroupLabels["alertname"],
-		firstAlertLabel(webhook.Alerts, "alertname"),
-		webhook.Title,
-	)
-	alert := grafanaNotification{
-		State:    state,
-		RuleName: ruleName,
-		NotificationType: grafanaNotificationType(strings.ToLower(firstMeaningful(
-			webhook.CommonAnnotations["notificationType"],
-			firstAlertAnnotation(webhook.Alerts, "notificationType"),
-		))),
-		Message: firstNonEmpty(
-			webhook.CommonAnnotations["description"],
-			firstAlertAnnotation(webhook.Alerts, "description"),
-		),
-		SortOrder: strings.ToLower(firstMeaningful(
-			webhook.CommonAnnotations["notificationSortOrder"],
-			firstAlertAnnotation(webhook.Alerts, "notificationSortOrder"),
-		)),
+	ruleName := webhook.CommonLabels["alertname"]
+	notificationType := grafanaNotificationType(webhook.CommonAnnotations["notificationType"])
+	if ruleName == "DatasourceError" {
+		notificationType = grafanaNotificationTypeAlert
+	} else if notificationType != grafanaNotificationTypeAlert && notificationType != grafanaNotificationTypeReport {
+		return grafanaNotification{}, fmt.Errorf("Grafana alert has invalid notificationType")
 	}
-	alert.SortAbs, _ = strconv.ParseBool(firstMeaningful(
-		webhook.CommonAnnotations["notificationSortAbsolute"],
-		firstAlertAnnotation(webhook.Alerts, "notificationSortAbsolute"),
-	))
+
+	sortOrder := strings.ToLower(webhook.CommonAnnotations["notificationSortOrder"])
+	if sortOrder != "" && sortOrder != "asc" && sortOrder != "desc" {
+		return grafanaNotification{}, fmt.Errorf("Grafana alert has invalid notificationSortOrder")
+	}
+
+	alert := grafanaNotification{
+		State:            state,
+		RuleName:         ruleName,
+		NotificationType: notificationType,
+		Message:          webhook.CommonAnnotations["description"],
+		SortOrder:        sortOrder,
+	}
+	if sortAbsolute := webhook.CommonAnnotations["notificationSortAbsolute"]; sortAbsolute != "" {
+		var err error
+		alert.SortAbs, err = strconv.ParseBool(sortAbsolute)
+		if err != nil {
+			return grafanaNotification{}, fmt.Errorf("Grafana alert has invalid notificationSortAbsolute")
+		}
+	}
 	if state == "alerting" {
 		for _, item := range webhook.Alerts {
 			itemState := normalizeGrafanaState(item.Status)
-			if itemState != "" && itemState != "alerting" {
+			if itemState == "ok" {
 				continue
 			}
+			if itemState != "alerting" {
+				return grafanaNotification{}, fmt.Errorf("Grafana alert item has invalid status")
+			}
 
-			if errorMessage := firstMeaningful(
-				item.Annotations["Error"],
-				item.Annotations["error"],
-			); errorMessage != "" {
-				source := firstMeaningful(item.Labels["rulename"], item.Labels["alertname"])
+			if errorMessage := meaningful(item.Annotations["Error"]); errorMessage != "" {
+				source := item.Labels["rulename"]
 				if source != "" && source != ruleName {
 					errorMessage = source + ": " + errorMessage
 				}
@@ -172,13 +170,13 @@ func normalizeGrafanaAlert(webhook grafanaWebhook) (grafanaNotification, error) 
 				continue
 			}
 
-			summary := firstMeaningful(item.Annotations["summary"])
+			summary := meaningful(item.Annotations["summary"])
 			if summary == "" {
 				return grafanaNotification{}, fmt.Errorf("Grafana alert is missing summary")
 			}
 			alert.Matches = append(alert.Matches, grafanaMatch{
 				Summary: summary,
-				SortKey: firstMeaningful(item.Annotations["notificationSortKey"]),
+				SortKey: meaningful(item.Annotations["notificationSortKey"]),
 			})
 		}
 		sortGrafanaMatches(&alert)
@@ -269,13 +267,13 @@ func compareGrafanaSortKeys(left, right string, absolute bool) int {
 }
 
 func normalizeGrafanaState(state string) string {
-	switch strings.ToLower(state) {
-	case "firing", "alerting":
+	switch state {
+	case "firing":
 		return "alerting"
-	case "resolved", "ok":
+	case "resolved":
 		return "ok"
 	default:
-		return strings.ToLower(state)
+		return ""
 	}
 }
 
@@ -289,43 +287,13 @@ func appendMessage(message, addition string) string {
 	return message + "\n" + addition
 }
 
-func firstMeaningful(values ...string) string {
-	for _, value := range values {
-		switch strings.ToLower(strings.TrimSpace(value)) {
-		case "", "[no value]", "<no value>", "no value":
-			continue
-		default:
-			return value
-		}
+func meaningful(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "[no value]", "<no value>", "no value":
+		return ""
+	default:
+		return value
 	}
-	return ""
-}
-
-func firstAlertLabel(alerts []grafanaWebhookAlert, key string) string {
-	for _, alert := range alerts {
-		if value := alert.Labels[key]; value != "" {
-			return value
-		}
-	}
-	return ""
-}
-
-func firstAlertAnnotation(alerts []grafanaWebhookAlert, key string) string {
-	for _, alert := range alerts {
-		if value := alert.Annotations[key]; value != "" {
-			return value
-		}
-	}
-	return ""
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if value != "" {
-			return value
-		}
-	}
-	return ""
 }
 
 func formatGrafanaAlert(channel service.Channel, alert grafanaNotification) any {
